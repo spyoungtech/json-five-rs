@@ -34,13 +34,14 @@ enum TokType {
 
 
 
-#[derive(PartialEq, Debug)]
-struct Token<'input> {
-    toktype: TokType,
-    start_index: usize,
-    end_index: usize,
-    source: &'input str,
+type Token = (usize, TokType, usize);
+
+#[derive(Debug, PartialEq)]
+struct Tokens<'input> {
+    tokens: Vec<Token>,
+    source: &'input str
 }
+
 
 fn slice_by_char_indices(s: &str, start: usize, end: usize) -> &str {
     let start_byte = s.char_indices()
@@ -56,11 +57,6 @@ fn slice_by_char_indices(s: &str, start: usize, end: usize) -> &str {
     &s[start_byte..end_byte]
 }
 
-impl <'input> Token<'input> {
-    pub fn lexeme(&self) -> &str {
-        slice_by_char_indices(self.source, self.start_index, self.end_index)
-    }
-}
 
 
 #[derive(Debug, PartialEq, Clone)]
@@ -68,10 +64,6 @@ enum TokenizerState {
     Start,
     End,
     Default,
-    InSingleQuoteString,
-    InDoubleQuoteString,
-    InNumber,
-
 }
 
 #[derive(Debug)]
@@ -90,7 +82,6 @@ struct TokenizationError<'input> {
 
 struct Source {
     filename: Option<String>
-
 }
 
 #[derive(Debug)]
@@ -101,7 +92,6 @@ struct Tokenizer<'input> {
     chars: Peekable<CharIndices<'input>>,
     lookahead: Option<(usize, char)>,
 }
-
 
 
 impl <'input> Tokenizer<'input> {
@@ -122,7 +112,7 @@ impl <'input> Tokenizer<'input> {
     }
 
 
-    fn process_string(&mut self) -> Result<Token<'input>, TokenizationError<'input>> {
+    fn process_string(&mut self) -> Result<Token, TokenizationError<'input>> {
         let (start_idx, quote_char) = self.lookahead.expect("Expected quote character");
 
         let string_type: TokType = match quote_char {
@@ -146,7 +136,7 @@ impl <'input> Tokenizer<'input> {
                             continue
                         },
                         c if c == quote_char && last_char != '\\' => {
-                            break Ok(Token { toktype: string_type, start_index: start_idx, end_index: idx+1, source: self.text })
+                            break Ok((start_idx, string_type, idx+1))
                         },
                         _ => continue
                     }
@@ -155,36 +145,36 @@ impl <'input> Tokenizer<'input> {
         }
     }
 
-    fn process_whitespace(&mut self) -> Result<Token<'input>, TokenizationError<'input>> {
+    fn process_whitespace(&mut self) -> Result<Token, TokenizationError<'input>> {
         let (start_idx, _) = self.lookahead.expect("Unexpected end of input, was expecting whitespace char");
         let mut last_index = start_idx;
         loop {
             match self.chars.peek() {
-                None => break Ok(Token{toktype: TokType::Whitespace, start_index: start_idx, end_index: last_index + 1, source: self.text}),
+                None => break Ok((start_idx, TokType::Whitespace, last_index + 1)),
                 Some((peeked_idx, peeked_char)) => {
                     if peeked_char.is_whitespace() {
                         last_index = *peeked_idx;
                         self.advance();
                         continue
                     } else {
-                        break Ok(Token{toktype: TokType::Whitespace, start_index: start_idx, end_index: last_index+1, source: self.text})
+                        break Ok((start_idx, TokType::Whitespace, last_index+1))
                     }
                 }
             }
         }
     }
 
-    fn process_octal(&mut self) -> Result<Token<'input>, TokenizationError<'input>> {
+    fn process_octal(&mut self) -> Result<Token, TokenizationError<'input>> {
         todo!()
     }
 
 
-    fn process_number(&mut self) -> Result<Token<'input>, TokenizationError<'input>>{
+    fn process_number(&mut self) -> Result<Token, TokenizationError<'input>>{
         let (start_idx, start_char) = self.lookahead.expect("Unexpected end of input, was expecting numeric char");
 
         let maybe_second_char = self.chars.peek();
         match maybe_second_char {
-            None => return Ok(Token{toktype: TokType::Integer, start_index: start_idx, end_index: start_idx + 1, source: self.text}),
+            None => return Ok((start_idx, TokType::Integer, start_idx + 1)),
             Some((second_idx, second_char)) if start_char == '0' => {
                 match second_char {
                     'x' | 'X' => {todo!()}
@@ -216,9 +206,9 @@ impl <'input> Tokenizer<'input> {
                         continue
                     } else {
                         if decimal_seen {
-                            break Ok(Token{toktype: TokType::Float, start_index: start_idx, end_index: last_index+1, source: self.text})
+                            break Ok((start_idx, TokType::Float, last_index+1))
                         } else {
-                            break Ok(Token{toktype: TokType::Integer, start_index: start_idx, end_index: last_index+1, source: self.text})
+                            break Ok((start_idx, TokType::Integer, last_index+1))
                         }
                     }
                 }
@@ -227,21 +217,21 @@ impl <'input> Tokenizer<'input> {
 
     }
 
-    fn tok_from_indices(&self, start: usize, end: usize) -> Result<Token<'input>, TokenizationError<'input>> {
+    fn tok_from_indices(&self, start: usize, end: usize) -> Result<Token, TokenizationError<'input>> {
         let lexeme= slice_by_char_indices(self.text, start, end);
         match lexeme {
-            "true" => Ok(Token{toktype: TokType::True, start_index: start, end_index: end, source: self.text}),
-            "false" => Ok(Token{toktype: TokType::False, start_index: start, end_index: end, source: self.text}),
-            "NaN" => Ok(Token{toktype: TokType::Nan, start_index: start, end_index: end, source: self.text}),
-            "Infinity" => Ok(Token{toktype: TokType::Infinity, start_index: start, end_index: end, source: self.text}),
-            "null" => Ok(Token{toktype: TokType::Null, start_index: start, end_index: end, source: self.text}),
+            "true" => Ok((start, TokType::True, end)),
+            "false" => Ok((start, TokType::False, end)),
+            "NaN" => Ok((start, TokType::Nan, end)),
+            "Infinity" => Ok((start, TokType::Infinity, end)),
+            "null" => Ok((start, TokType::Null, end)),
             _ => {
-                Ok(Token{toktype: TokType::Name, start_index: start, end_index: end, source: self.text})
+                Ok((start, TokType::Name, end))
             }
         }
     }
 
-    fn process_identifier_or_const(&mut self) -> Result<Token<'input>, TokenizationError<'input>> {
+    fn process_identifier_or_const(&mut self) -> Result<Token, TokenizationError<'input>> {
         let (start_idx, _) = self.lookahead.expect("Unexpected end of input, was expecting identifier/const char");
         let mut last_idx = start_idx;
         loop {
@@ -263,27 +253,27 @@ impl <'input> Tokenizer<'input> {
 
     }
 
-    fn next_token(&mut self) -> Result<Token<'input>, TokenizationError<'input>> {
+    fn next_token(&mut self) -> Result<Token, TokenizationError<'input>> {
         let maybe_last = self.lookahead;
         let maybe_next = self.advance();
         match maybe_next {
             None => {
                 match maybe_last {
-                    Some((last_idx, _)) => Ok(Token {toktype: TokType::EOF, start_index: last_idx+1, end_index: last_idx+1, source:self.text}),
-                    None => Ok(Token {toktype: TokType::EOF, start_index: 0, end_index: 0, source: self.text}),
+                    Some((last_idx, _)) => Ok((last_idx+1, TokType::EOF, last_idx+1)),
+                    None => Ok((0, TokType::EOF, 0)),
                 }
             }
             Some((next_idx, next)) => {
                 match next {
-                    '{' => Ok(Token{toktype: TokType:: LeftBrace, start_index: next_idx, end_index: next_idx + 1, source: self.text}),
-                    '}' => Ok(Token{toktype: TokType:: RightBrace, start_index: next_idx, end_index: next_idx + 1, source: self.text}),
-                    '[' => Ok(Token{toktype: TokType:: LeftBracket, start_index: next_idx, end_index: next_idx + 1, source: self.text}),
-                    ']' => Ok(Token{toktype: TokType:: RightBracket, start_index: next_idx, end_index: next_idx + 1, source: self.text}),
-                    ',' => Ok(Token{toktype: TokType:: Comma, start_index: next_idx, end_index: next_idx + 1, source: self.text}),
-                    ':' => Ok(Token{toktype: TokType:: Colon, start_index: next_idx, end_index: next_idx + 1, source: self.text}),
-                    ';' => Ok(Token{toktype: TokType:: Semi, start_index: next_idx, end_index: next_idx + 1, source: self.text}),
-                    '+' => Ok(Token{toktype: TokType:: Plus, start_index: next_idx, end_index: next_idx + 1, source: self.text}),
-                    '-' => Ok(Token{toktype: TokType:: Minus, start_index: next_idx, end_index: next_idx + 1, source: self.text}),
+                    '{' => Ok((next_idx, TokType:: LeftBrace, next_idx + 1)),
+                    '}' => Ok((next_idx, TokType:: RightBrace, next_idx + 1)),
+                    '[' => Ok((next_idx, TokType:: LeftBracket, next_idx + 1)),
+                    ']' => Ok((next_idx, TokType:: RightBracket, next_idx + 1)),
+                    ',' => Ok((next_idx, TokType:: Comma, next_idx + 1)),
+                    ':' => Ok((next_idx, TokType:: Colon, next_idx + 1)),
+                    ';' => Ok((next_idx, TokType:: Semi, next_idx + 1)),
+                    '+' => Ok((next_idx, TokType:: Plus, next_idx + 1)),
+                    '-' => Ok((next_idx, TokType:: Minus, next_idx + 1)),
                     '\'' | '"' => self.process_string(),
                     c if c.is_ascii_digit() => self.process_number(),
                     c if c.is_whitespace() => {
@@ -294,7 +284,7 @@ impl <'input> Tokenizer<'input> {
                             self.next_token()
                         }
                     },
-                    '\\' if *self.chars.peek().map(|(_, x)| x).unwrap_or(&'!') == '\\' {
+                    '\\' if *self.chars.peek().map(|(_, x)| x).unwrap_or(&'!') == '\\' => {
                         todo!()
                     }
                     _ => self.process_identifier_or_const()
@@ -303,7 +293,7 @@ impl <'input> Tokenizer<'input> {
         }
     }
 
-    fn tokenize(&mut self) -> Result<Vec<Token<'input>>, TokenizationError<'input>> {
+    fn tokenize(&mut self) -> Result<Tokens<'input>, TokenizationError<'input>> {
         if self.tokenizer_state != TokenizerState::Start {
             panic!("Can only tokenize once!")
         }
@@ -313,44 +303,47 @@ impl <'input> Tokenizer<'input> {
         let mut tokens: Vec<Token> = Vec::new();
         loop {
             let tok = self.next_token()?;
-            if tok.toktype == TokType::EOF {
+            if tok.1 == TokType::EOF {
                 tokens.push(tok);
                 break
             } else {
                 tokens.push(tok);
             }
         }
-        Ok(tokens)
+        Ok(Tokens{tokens: tokens, source: self.text})
     }
 }
 
-pub fn tokenize(text: &'_ str) -> Vec<Token<'_>> {
+pub fn tokenize(text: &'_ str) -> Tokens<'_> {
     Tokenizer::new(text).tokenize().unwrap()
 }
 
 #[cfg(test)]
 mod test {
+    use crate::tokenize::TokType::*;
     use super::*;
     #[test]
     fn test_foo() {
         let text = "";
         let toks = tokenize(text);
-        let expected = vec![Token{toktype: TokType::EOF, start_index: 0, end_index: 0, source: text}];
-        assert_eq!(toks, expected)
+        let expected = Tokens{tokens: vec![(0, EOF, 0)], source: text};
+        assert_eq!(toks, expected);
     }
 
     #[test]
     fn test_heck() {
         let text = "{}";
         let toks = tokenize(text);
-        println!("{:?}", toks)
+        let expected = Tokens{tokens: vec![(0, LeftBrace, 1), (1, RightBrace, 2), (2, EOF, 2)], source: text};
+        assert_eq!(toks, expected);
     }
 
     #[test]
     fn test_heck2() {
         let text = "{\"foo\":\"bar\"}";
         let toks = tokenize(text);
-        println!("{:?}", toks)
+        let expected = Tokens{tokens: vec![(0, LeftBrace, 1), (1, DoubleQuotedString, 6), (6, Colon, 7), (7, DoubleQuotedString, 12), (12, RightBrace, 13), (13, EOF, 13)], source: text};
+        assert_eq!(toks, expected)
     }
 }
 
