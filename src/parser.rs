@@ -305,6 +305,7 @@ fn parse_text(source: &str) -> JSONText {
 
 #[cfg(test)]
 mod tests {
+    use crate::parser::JSONValue::*;
     use super::*;
     #[test]
     fn test_foo() {
@@ -320,9 +321,38 @@ mod tests {
         assert_eq!(res, expected)
     }
 
+    #[test]
     fn test_identifier(){
         let res = parse_text("{foo: \"bar\"}");
         let expected = JSONText{value: JSONValue::JSONObject {key_value_pairs: vec![JSONKeyValuePair{key: JSONValue::Identifier("foo".to_string()), value: JSONValue::DoubleQuotedString("\"bar\"".to_string())}]}};
+        assert_eq!(res, expected)
+    }
+
+    #[test]
+    fn test_array() {
+        let res = parse_text("[1,2,3]");
+        let expected = JSONText{value: JSONArray {values: vec![JSONValue::Integer(1), JSONValue::Integer(2), JSONValue::Integer(3)]}};
+        assert_eq!(res, expected)
+    }
+
+    #[test]
+    fn val_int() {
+        let res = parse_text("1");
+        let expected = JSONText{value: Integer(1)};
+        assert_eq!(res, expected)
+    }
+
+    #[test]
+    fn val_float() {
+        let res = parse_text("1.0");
+        let expected = JSONText{value: Float(1.0)};
+        assert_eq!(res, expected)
+    }
+
+    #[test]
+    fn val_string() {
+        let res = parse_text("'foo'");
+        let expected = JSONText{value: SingleQuotedString("\'foo\'".to_string())};
         assert_eq!(res, expected)
     }
 }
