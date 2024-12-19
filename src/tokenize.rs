@@ -3,7 +3,7 @@ use std::iter::{Peekable, Filter};
 use std::str::{CharIndices, Chars};
 
 #[derive(PartialEq, Clone, Debug)]
-enum TokType {
+pub(crate) enum TokType {
     LeftBrace,
     RightBrace,
     LeftBracket,
@@ -34,12 +34,22 @@ enum TokType {
 
 
 // Start byte offset, token type, end byte offset (noninclusive)
-type TokenSpan = (usize, TokType, usize);
+pub(crate) type TokenSpan = (usize, TokType, usize);
+
+
+
 
 #[derive(Debug, PartialEq)]
-struct Tokens<'input> {
-    tokens: Vec<TokenSpan>,
-    source: &'input str
+pub(crate) struct Tokens<'input> {
+    tok_spans: Vec<TokenSpan>,
+    pub (crate) source: &'input str
+}
+
+
+impl<'input> Tokens<'input> {
+    pub(crate) fn tokens_with_source(&self) -> Vec<(&TokenSpan, &'input str)> {
+        self.tok_spans.iter().map(|span| (span, &self.source[span.0 .. span.2])).collect()
+    }
 }
 
 #[derive(Debug)]
@@ -420,7 +430,7 @@ impl <'input> Tokenizer<'input> {
                 tokens.push(tok);
             }
         }
-        Ok(Tokens{tokens: tokens, source: self.text})
+        Ok(Tokens{ tok_spans: tokens, source: self.text})
     }
 }
 
@@ -436,7 +446,7 @@ mod test {
     fn test_foo() {
         let text = "";
         let toks = tokenize(text);
-        let expected = Tokens{tokens: vec![(0, EOF, 0)], source: text};
+        let expected = Tokens{ tok_spans: vec![(0, EOF, 0)], source: text};
         assert_eq!(toks, expected);
     }
 
@@ -444,7 +454,7 @@ mod test {
     fn test_heck() {
         let text = "{}";
         let toks = tokenize(text);
-        let expected = Tokens{tokens: vec![(0, LeftBrace, 1), (1, RightBrace, 2), (2, EOF, 2)], source: text};
+        let expected = Tokens{ tok_spans: vec![(0, LeftBrace, 1), (1, RightBrace, 2), (2, EOF, 2)], source: text};
         assert_eq!(toks, expected);
     }
 
@@ -452,7 +462,7 @@ mod test {
     fn test_heck2() {
         let text = "{\"foo\":\"bar\"}";
         let toks = tokenize(text);
-        let expected = Tokens{tokens: vec![(0, LeftBrace, 1), (1, DoubleQuotedString, 6), (6, Colon, 7), (7, DoubleQuotedString, 12), (12, RightBrace, 13), (13, EOF, 13)], source: text};
+        let expected = Tokens{ tok_spans: vec![(0, LeftBrace, 1), (1, DoubleQuotedString, 6), (6, Colon, 7), (7, DoubleQuotedString, 12), (12, RightBrace, 13), (13, EOF, 13)], source: text};
         assert_eq!(toks, expected)
     }
 
@@ -460,7 +470,7 @@ mod test {
     fn test_single_quoted_string() {
         let text = "{'foo':'bar'}";
         let toks = tokenize(text);
-        let expected = Tokens{tokens: vec![(0, LeftBrace, 1), (1, SingleQuotedString, 6), (6, Colon, 7), (7, SingleQuotedString, 12), (12, RightBrace, 13), (13, EOF, 13)], source: text};
+        let expected = Tokens{ tok_spans: vec![(0, LeftBrace, 1), (1, SingleQuotedString, 6), (6, Colon, 7), (7, SingleQuotedString, 12), (12, RightBrace, 13), (13, EOF, 13)], source: text};
         assert_eq!(toks, expected);
     }
 
@@ -468,7 +478,7 @@ mod test {
     fn test_array() {
         let text = "[1,2,3]";
         let toks = tokenize(text);
-        let expected = Tokens{tokens: vec![(0, LeftBracket, 1), (1, Integer, 2), (2, Comma, 3), (3, Integer, 4), (4, Comma, 5), (5, Integer, 6), (6, RightBracket, 7), (7, EOF, 7)], source: text};
+        let expected = Tokens{ tok_spans: vec![(0, LeftBracket, 1), (1, Integer, 2), (2, Comma, 3), (3, Integer, 4), (4, Comma, 5), (5, Integer, 6), (6, RightBracket, 7), (7, EOF, 7)], source: text};
         assert_eq!(toks, expected);
     }
 
@@ -476,7 +486,7 @@ mod test {
     fn test_float_number() {
         let text = "[1.23,4.56]";
         let toks = tokenize(text);
-        let expected = Tokens{tokens: vec![(0, LeftBracket, 1), (1, Float, 5), (5, Comma, 6), (6, Float, 10), (10, RightBracket, 11), (11, EOF, 11)], source: text};
+        let expected = Tokens{ tok_spans: vec![(0, LeftBracket, 1), (1, Float, 5), (5, Comma, 6), (6, Float, 10), (10, RightBracket, 11), (11, EOF, 11)], source: text};
         assert_eq!(toks, expected);
     }
 
@@ -484,7 +494,7 @@ mod test {
     fn test_exponent_number() {
         let text = "[1e10,2e-5]";
         let toks = tokenize(text);
-        let expected = Tokens{tokens: vec![(0, LeftBracket, 1), (1, Exponent, 5), (5, Comma, 6), (6, Exponent, 10), (10, RightBracket, 11), (11, EOF, 11)], source: text};
+        let expected = Tokens{ tok_spans: vec![(0, LeftBracket, 1), (1, Exponent, 5), (5, Comma, 6), (6, Exponent, 10), (10, RightBracket, 11), (11, EOF, 11)], source: text};
         assert_eq!(toks, expected);
     }
 
@@ -492,7 +502,7 @@ mod test {
     fn test_whitespace() {
         let text = " {\n\t} ";
         let toks = tokenize(text);
-        let expected = Tokens{tokens: vec![(1, LeftBrace, 2), (4, RightBrace, 5), (6, EOF, 6)], source: text};
+        let expected = Tokens{ tok_spans: vec![(1, LeftBrace, 2), (4, RightBrace, 5), (6, EOF, 6)], source: text};
         assert_eq!(toks, expected);
     }
 
@@ -500,7 +510,7 @@ mod test {
     fn test_true_false_null() {
         let text = "[true,false,null]";
         let toks = tokenize(text);
-        let expected = Tokens{source: text, tokens: vec![(0, LeftBracket, 1), (1, True, 5), (5, Comma, 6), (6, False, 11), (11, Comma, 12), (12, Null, 16), (16, RightBracket, 17), (17, EOF, 17)]};
+        let expected = Tokens{source: text, tok_spans: vec![(0, LeftBracket, 1), (1, True, 5), (5, Comma, 6), (6, False, 11), (11, Comma, 12), (12, Null, 16), (16, RightBracket, 17), (17, EOF, 17)]};
         assert_eq!(toks, expected);
         }
 
@@ -508,7 +518,7 @@ mod test {
     fn test_number() {
         let text = "123";
         let toks = tokenize(text);
-        let expected = Tokens{source: text, tokens: vec![(0, Integer, 3), (3, EOF, 3)]};
+        let expected = Tokens{source: text, tok_spans: vec![(0, Integer, 3), (3, EOF, 3)]};
         assert_eq!(toks, expected);
 
     }
