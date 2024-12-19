@@ -187,7 +187,19 @@ impl <'input> Tokenizer<'input> {
         loop {
             match self.chars.peek() {
                 None => {
-                    todo!()
+                    if unary_seen || decimal_seen || exponent_seen {
+                        let (_, last_char) = self.lookahead.unwrap();
+                        if "+-eE.".contains(last_char) {
+                            return Err(TokenizationError{message: format!("Invalid number literal (missing digit after {:?})", last_char), index: start_idx, source: self.text})
+                        }
+                    }
+                    if exponent_seen {
+                        break Ok((start_idx, TokType::Exponent, last_index+1))
+                    } else if decimal_seen {
+                        break Ok((start_idx, TokType::Float, last_index+1))
+                    } else {
+                        break Ok((start_idx, TokType::Integer, last_index+1))
+                    }
                 },
                 Some((next_idx, next_char)) => {
                     match *next_char {
@@ -281,7 +293,73 @@ impl <'input> Tokenizer<'input> {
                 }
             }
         }
+    }
 
+    fn process_comment(&mut self) -> Result<TokenSpan, TokenizationError<'input>> {
+        let (start_idx, char) = self.lookahead.expect("Expected comment start");
+        let (mut last_idx, star_or_slash) = self.advance().expect("Expected second comment char");
+        match star_or_slash {
+            '/' => {
+                loop {
+                    match self.chars.peek() {
+                        None => {
+                            return Ok((start_idx, TokType::LineComment, last_idx))
+                        },
+                        Some((peeked_idx, peeked_char)) => {
+                            match peeked_char {
+                                '\n' | '\r' | '\u{2028}' | '\u{2029}' => {
+                                    return Ok((start_idx, TokType::LineComment, last_idx))
+                                }
+                                _ => {
+                                    last_idx = *peeked_idx;
+                                    self.advance();
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            '*' => {
+                loop {
+                    match self.chars.peek() {
+                        None => {
+                            return Err(TokenizationError{message: "Unexpected end of input while processing block comment".to_string(), index: start_idx, source: self.text})
+                        }
+                        Some((peeked_idx, peeked_char)) => {
+                            match peeked_char {
+                                '*' => {
+                                    last_idx = *peeked_idx;
+                                    self.advance();
+                                    let maybe_next_next = self.chars.peek();
+                                    match maybe_next_next {
+                                        None => {
+                                            return Err(TokenizationError{message: "Unexpected end of input while processing block comment".to_string(), index: start_idx, source: self.text})
+                                        },
+                                        Some((next_peeked_idx, next_peeked_char)) => {
+                                            match next_peeked_char {
+                                                '/' => {
+                                                    (last_idx, _) = self.advance().unwrap();
+                                                    return Ok((start_idx, TokType::BlockComment, last_idx))
+                                                }
+                                                _ => {
+                                                    continue
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    last_idx = *peeked_idx;
+                                    self.advance();
+                                    continue
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => panic!("Invalid second comment char")
+        }
     }
 
     fn next_token(&mut self) -> Result<TokenSpan, TokenizationError<'input>> {
@@ -316,8 +394,14 @@ impl <'input> Tokenizer<'input> {
                             self.next_token()
                         }
                     },
-                    '\\' if *self.chars.peek().map(|(_, x)| x).unwrap_or(&'!') == '\\' => {
-                        todo!()
+                    '/' => {
+                        let (_, next_next) = self.chars.peek().unwrap_or(&(usize::MAX, '!'));
+                        match next_next {
+                            '/' | '*' => self.process_comment(),
+                            _ => {
+                                return Err(TokenizationError{message: "unexpected token '/'".to_string(), index: next_idx, source: self.text})
+                            }
+                        }
                     }
                     _ => self.process_identifier_or_const()
                 }
@@ -419,4 +503,13 @@ mod test {
         let expected = Tokens{source: text, tokens: vec![(0, LeftBracket, 1), (1, True, 5), (5, Comma, 6), (6, False, 11), (11, Comma, 12), (12, Null, 16), (16, RightBracket, 17), (17, EOF, 17)]};
         assert_eq!(toks, expected);
         }
+
+    #[test]
+    fn test_number() {
+        let text = "123";
+        let toks = tokenize(text);
+        let expected = Tokens{source: text, tokens: vec![(0, Integer, 3), (3, EOF, 3)]};
+        assert_eq!(toks, expected);
+
+    }
 }
