@@ -242,8 +242,8 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
             TokType::Exponent => {
                 todo!()
             }
-            TokType::SingleQuotedString => Ok(JSONValue::SingleQuotedString(lexeme.to_string())),
-            TokType::DoubleQuotedString => Ok(JSONValue::DoubleQuotedString(lexeme.to_string())),
+            TokType::SingleQuotedString => Ok(JSONValue::SingleQuotedString(lexeme[1..lexeme.len() - 1].to_string())),
+            TokType::DoubleQuotedString => Ok(JSONValue::DoubleQuotedString(lexeme[1..lexeme.len() - 1].to_string())),
             TokType::True => Ok(JSONValue::Bool(true)),
             TokType::False => Ok(JSONValue::Bool(false)),
             TokType::Null => Ok(JSONValue::Null),
@@ -322,14 +322,14 @@ mod tests {
     #[test]
     fn test_object() {
         let res = parse_text("{\"foo\": \"bar\"}").unwrap();
-        let expected = JSONText{value: JSONValue::JSONObject {key_value_pairs: vec![JSONKeyValuePair{key: JSONValue::DoubleQuotedString("\"foo\"".to_string()), value: JSONValue::DoubleQuotedString("\"bar\"".to_string())}]}};
+        let expected = JSONText{value: JSONValue::JSONObject {key_value_pairs: vec![JSONKeyValuePair{key: JSONValue::DoubleQuotedString("foo".to_string()), value: JSONValue::DoubleQuotedString("bar".to_string())}]}};
         assert_eq!(res, expected)
     }
 
     #[test]
     fn test_identifier(){
         let res = parse_text("{foo: \"bar\"}").unwrap();
-        let expected = JSONText{value: JSONValue::JSONObject {key_value_pairs: vec![JSONKeyValuePair{key: JSONValue::Identifier("foo".to_string()), value: JSONValue::DoubleQuotedString("\"bar\"".to_string())}]}};
+        let expected = JSONText{value: JSONValue::JSONObject {key_value_pairs: vec![JSONKeyValuePair{key: JSONValue::Identifier("foo".to_string()), value: JSONValue::DoubleQuotedString("bar".to_string())}]}};
         assert_eq!(res, expected)
     }
 
@@ -357,13 +357,13 @@ mod tests {
     #[test]
     fn val_string() {
         let res = parse_text("'foo'").unwrap();
-        let expected = JSONText{value: SingleQuotedString("\'foo\'".to_string())};
+        let expected = JSONText{value: SingleQuotedString("foo".to_string())};
         assert_eq!(res, expected)
     }
     #[test]
     fn test_empty_string() {
         let res = parse_text("\"\"").unwrap();
-        let expected = JSONText { value: DoubleQuotedString("\"\"".to_string()) };
+        let expected = JSONText { value: DoubleQuotedString("".to_string()) };
         assert_eq!(res, expected);
     }
 
@@ -381,8 +381,8 @@ mod tests {
             value: JSONObject {
                 key_value_pairs: vec![
                     JSONKeyValuePair {
-                        key: DoubleQuotedString("\"key\"".to_string()),
-                        value: DoubleQuotedString("\"value\"".to_string()),
+                        key: DoubleQuotedString("key".to_string()),
+                        value: DoubleQuotedString("value".to_string()),
                     }
                 ]
             }
@@ -408,11 +408,11 @@ mod tests {
             value: JSONObject {
                 key_value_pairs: vec![
                     JSONKeyValuePair {
-                        key: DoubleQuotedString("\"a\"".to_string()),
+                        key: DoubleQuotedString("a".to_string()),
                         value: Integer(1),
                     },
                     JSONKeyValuePair {
-                        key: DoubleQuotedString("\"b\"".to_string()),
+                        key: DoubleQuotedString("b".to_string()),
                         value: Integer(2),
                     }
                 ]
@@ -429,7 +429,7 @@ mod tests {
                 key_value_pairs: vec![
                     JSONKeyValuePair {
                         key: Identifier("key".to_string()),
-                        value: DoubleQuotedString("\"value\"".to_string()),
+                        value: DoubleQuotedString("value".to_string()),
                     }
                 ]
             }
@@ -440,14 +440,14 @@ mod tests {
     #[test]
     fn test_multiline_string() {
         let res = parse_text("\"multi\\\nline\"").unwrap();
-        let expected = JSONText { value: DoubleQuotedString("\"multi\\\nline\"".to_string()) };
+        let expected = JSONText { value: DoubleQuotedString("multi\\\nline".to_string()) };
         assert_eq!(res, expected);
     }
 
     #[test]
     fn test_unicode_characters() {
         let res = parse_text("\"\\u2764\"").unwrap();
-        let expected = JSONText { value: DoubleQuotedString("\"\\u2764\"".to_string()) };
+        let expected = JSONText { value: DoubleQuotedString("\\u2764".to_string()) };
         assert_eq!(res, expected);
     }
     #[test]
