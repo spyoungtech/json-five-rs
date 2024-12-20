@@ -11,7 +11,6 @@ pub(crate) enum TokType {
     RightBracket,
     Comma,
     Colon,
-    Semi,
     Name,
     SingleQuotedString,
     DoubleQuotedString,
@@ -300,8 +299,11 @@ impl <'input> Tokenizer<'input> {
     }
 
     fn process_identifier_or_const(&mut self) -> Result<TokenSpan, TokenizationError> {
-        let (start_idx, _) = self.lookahead.expect("Unexpected end of input, was expecting identifier/const char");
+        let (start_idx, start_char) = self.lookahead.expect("Unexpected end of input, was expecting identifier/const char");
         let mut last_idx = start_idx;
+
+        // TODO: ensure that the first character is a valid identifier start character
+
         loop {
             match self.chars.peek() {
                 None => break self.tok_from_indices(start_idx, last_idx+1),
@@ -405,7 +407,6 @@ impl <'input> Tokenizer<'input> {
                     ']' => Ok((next_idx, TokType:: RightBracket, next_idx + 1)),
                     ',' => Ok((next_idx, TokType:: Comma, next_idx + 1)),
                     ':' => Ok((next_idx, TokType:: Colon, next_idx + 1)),
-                    ';' => Ok((next_idx, TokType:: Semi, next_idx + 1)),
                     '+' => Ok((next_idx, TokType:: Plus, next_idx + 1)),
                     '-' => Ok((next_idx, TokType:: Minus, next_idx + 1)),
                     '\'' | '"' => self.process_string(),
