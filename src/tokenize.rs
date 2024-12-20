@@ -47,7 +47,7 @@ pub(crate) struct Tokens<'input> {
 
 
 impl<'input> Tokens<'input> {
-    pub(crate) fn tokens_with_source(&self) -> Vec<(&TokenSpan, &'input str)> {
+    pub(crate) fn spans_with_source(&self) -> Vec<(&TokenSpan, &'input str)> {
         self.tok_spans.iter().map(|span| (span, &self.source[span.0 .. span.2])).collect()
     }
 }

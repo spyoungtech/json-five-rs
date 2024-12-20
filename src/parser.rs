@@ -74,7 +74,7 @@ struct JSON5Parser<'toks, 'input> {
 
 impl<'toks, 'input> JSON5Parser<'toks, 'input> {
     fn new(tokens: &'toks Tokens<'input>) -> Self {
-        JSON5Parser { source_tokens: tokens.tokens_with_source().into_iter().peekable(), lookahead: None, source: tokens.source }
+        JSON5Parser { source_tokens: tokens.spans_with_source().into_iter().peekable(), lookahead: None, source: tokens.source }
     }
 
     fn advance(&mut self) -> Option<(&'toks TokenSpan, &'input str)> {
