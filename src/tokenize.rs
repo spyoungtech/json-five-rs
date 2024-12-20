@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::iter::{Peekable, Filter};
 use std::str::{CharIndices, Chars};
+use crate::utils::get_line_col_char;
 
 #[derive(PartialEq, Clone, Debug)]
 pub(crate) enum TokType {
@@ -53,17 +54,17 @@ impl<'input> Tokens<'input> {
 }
 
 #[derive(Debug)]
-struct TokenizationError<'input> {
+struct TokenizationError {
     message: String,
-    index: usize,
-    source: &'input str,
+    index: usize, // byte offset
+    lineno: usize,
+    colno: usize,
+    char_index: usize // char offset
 }
 
-impl<'input> Display for TokenizationError<'input> {
+impl<'input> Display for TokenizationError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        use crate::utils::get_line_col_char;
-        let (line, col, char) = get_line_col_char(self.source, self.index);
-        write!(f, "TokenizationError: {}: line {} column {} (char {})", self.message, line, col, char)
+        write!(f, "TokenizationError: {}: line {} column {} (char {})", self.message, self.lineno, self.colno, self.char_index)
     }
 }
 
@@ -96,8 +97,12 @@ impl <'input> Tokenizer<'input> {
         self.chars.peek().is_none()
     }
 
+    fn make_error(&self, message: String, start_index: usize) -> TokenizationError {
+        let (lineno, colno, char_index) = get_line_col_char(self.text, start_index);
+        TokenizationError{message: message, index: start_index, lineno: lineno, colno: colno, char_index: char_index}
+    }
 
-    fn process_string(&mut self) -> Result<TokenSpan, TokenizationError<'input>> {
+    fn process_string(&mut self) -> Result<TokenSpan, TokenizationError> {
         let (start_idx, quote_char) = self.lookahead.expect("Expected quote character");
 
         let string_type: TokType = match quote_char {
@@ -110,26 +115,33 @@ impl <'input> Tokenizer<'input> {
 
         loop {
             match self.advance() {
-                None => break Err(TokenizationError { message: "Unterminated string starting at".to_string(), index: start_idx, source: self.text }),
+                None => {
+                    break Err(self.make_error("Unterminated string starting at".to_string(), start_idx))
+                },
                 Some((idx, char)) => {
                     match char {
                         '\n' | '\r' | '\u{2028}' | '\u{2029}' => {
                             if last_char != '\\' {
-                                break Err(TokenizationError{ message: "Unexpected line terminator in string literal started at".to_string(), index: idx+1, source: self.text})
+                                let (lineno, colno, char_index) = get_line_col_char(self.text, start_idx);
+                                break Err(self.make_error("Unexpected line terminator without continuation in string literal started at".to_string(), start_idx))
                             }
+                            last_char = char;
                             continue
                         },
                         c if c == quote_char && last_char != '\\' => {
                             break Ok((start_idx, string_type, idx+1))
                         },
-                        _ => continue
+                        _ => {
+                            last_char = char;
+                            continue
+                        }
                     }
                 }
             }
         }
     }
 
-    fn process_whitespace(&mut self) -> Result<TokenSpan, TokenizationError<'input>> {
+    fn process_whitespace(&mut self) -> Result<TokenSpan, TokenizationError> {
         let (start_idx, _) = self.lookahead.expect("Unexpected end of input, was expecting whitespace char");
         let mut last_index = start_idx;
         loop {
@@ -148,11 +160,11 @@ impl <'input> Tokenizer<'input> {
         }
     }
 
-    fn process_octal(&mut self) -> Result<TokenSpan, TokenizationError<'input>> {
+    fn process_octal(&mut self) -> Result<TokenSpan, TokenizationError> {
         todo!()
     }
 
-    fn process_hexadecimal(&mut self) -> Result<TokenSpan, TokenizationError<'input>> {
+    fn process_hexadecimal(&mut self) -> Result<TokenSpan, TokenizationError> {
         let (start_idx, start_char) = self.lookahead.expect("Unexpected end of input, was expecting numeric char");
         let (_, x_char) = self.advance().expect("Expected hex x");
         assert_eq!(start_char, '0');
@@ -166,7 +178,7 @@ impl <'input> Tokenizer<'input> {
                 None => break Ok((start_idx, TokType::Hexadecimal, last_idx+1)),
                 Some((offset, char)) => {
                     if !HEX_CHARS.contains(char) {
-                        break Err(TokenizationError{message: format!("invalid character ({:?}) in hexadecimal literal starting at", char), index: start_idx, source: self.text})
+                        break Err(self.make_error(format!("invalid character ({:?}) in hexadecimal literal starting at", char), start_idx))
                     }
                     last_idx = offset;
                     continue
@@ -175,7 +187,7 @@ impl <'input> Tokenizer<'input> {
         }
     }
 
-    fn process_number(&mut self) -> Result<TokenSpan, TokenizationError<'input>>{
+    fn process_number(&mut self) -> Result<TokenSpan, TokenizationError>{
         let (start_idx, start_char) = self.lookahead.expect("Unexpected end of input, was expecting numeric char");
 
         let maybe_second_char = self.chars.peek();
@@ -184,7 +196,10 @@ impl <'input> Tokenizer<'input> {
             Some((second_idx, second_char)) if start_char == '0' => {
                 match second_char {
                     'x' | 'X' => {return self.process_hexadecimal()}
-                    _ => {},
+                    sc if sc.is_ascii_digit() => {
+                        return self.process_octal()
+                    },
+                    _ => {}
                 }
             }
             _ => {}
@@ -200,7 +215,7 @@ impl <'input> Tokenizer<'input> {
                     if unary_seen || decimal_seen || exponent_seen {
                         let (_, last_char) = self.lookahead.unwrap();
                         if "+-eE.".contains(last_char) {
-                            return Err(TokenizationError{message: format!("Invalid number literal (missing digit after {:?})", last_char), index: start_idx, source: self.text})
+                            return Err(self.make_error(format!("Invalid number literal (missing digit after {:?})", last_char), start_idx))
                         }
                     }
                     if exponent_seen {
@@ -220,7 +235,7 @@ impl <'input> Tokenizer<'input> {
                         },
                         '.' => {
                             if decimal_seen {
-                                return Err(TokenizationError{message: "Invalid number literal (unexpected decimal)".to_string(), source: self.text, index: start_idx})
+                                return Err(self.make_error("Invalid number literal (unexpected decimal)".to_string(), start_idx))
                             }
                             decimal_seen = true;
                             last_index = *next_idx;
@@ -229,7 +244,7 @@ impl <'input> Tokenizer<'input> {
                         },
                         'e' | 'E' => {
                             if exponent_seen {
-                                return Err(TokenizationError{message: "Invalid number literal (only one exponent part is allowed)".to_string(), source: self.text, index: start_idx})
+                                return Err(self.make_error("Invalid number literal (only one exponent part is allowed)".to_string(), start_idx))
                             }
                             exponent_seen = true;
                             last_index = *next_idx;
@@ -244,7 +259,7 @@ impl <'input> Tokenizer<'input> {
                                     self.advance();
                                 }
                                 _ => {
-                                    return Err(TokenizationError{message: "Unary within number literal only allowed after exponent part".to_string(), index: start_idx, source: self.text})
+                                    return Err(self.make_error("Unary within number literal only allowed after exponent part".to_string(), start_idx))
                                 }
                             }
                         }
@@ -252,7 +267,7 @@ impl <'input> Tokenizer<'input> {
                             if unary_seen || decimal_seen || exponent_seen {
                                 let (_, last_char) = self.lookahead.unwrap();
                                 if "+-eE.".contains(last_char) {
-                                    return Err(TokenizationError{message: format!("Invalid number literal (missing digit after {:?})", last_char), index: start_idx, source: self.text})
+                                    return Err(self.make_error(format!("Invalid number literal (missing digit after {:?})", last_char), start_idx))
                                 }
                             }
                             if exponent_seen {
@@ -270,7 +285,7 @@ impl <'input> Tokenizer<'input> {
 
     }
 
-    fn tok_from_indices(&self, start: usize, end: usize) -> Result<TokenSpan, TokenizationError<'input>> {
+    fn tok_from_indices(&self, start: usize, end: usize) -> Result<TokenSpan, TokenizationError> {
         let lexeme= &self.text[start .. end];
         match lexeme {
             "true" => Ok((start, TokType::True, end)),
@@ -284,7 +299,7 @@ impl <'input> Tokenizer<'input> {
         }
     }
 
-    fn process_identifier_or_const(&mut self) -> Result<TokenSpan, TokenizationError<'input>> {
+    fn process_identifier_or_const(&mut self) -> Result<TokenSpan, TokenizationError> {
         let (start_idx, _) = self.lookahead.expect("Unexpected end of input, was expecting identifier/const char");
         let mut last_idx = start_idx;
         loop {
@@ -305,7 +320,7 @@ impl <'input> Tokenizer<'input> {
         }
     }
 
-    fn process_comment(&mut self) -> Result<TokenSpan, TokenizationError<'input>> {
+    fn process_comment(&mut self) -> Result<TokenSpan, TokenizationError> {
         let (start_idx, char) = self.lookahead.expect("Expected comment start");
         let (mut last_idx, star_or_slash) = self.advance().expect("Expected second comment char");
         match star_or_slash {
@@ -333,7 +348,7 @@ impl <'input> Tokenizer<'input> {
                 loop {
                     match self.chars.peek() {
                         None => {
-                            return Err(TokenizationError{message: "Unexpected end of input while processing block comment".to_string(), index: start_idx, source: self.text})
+                            return Err(self.make_error("Unexpected end of input while processing block comment".to_string(), start_idx))
                         }
                         Some((peeked_idx, peeked_char)) => {
                             match peeked_char {
@@ -343,7 +358,7 @@ impl <'input> Tokenizer<'input> {
                                     let maybe_next_next = self.chars.peek();
                                     match maybe_next_next {
                                         None => {
-                                            return Err(TokenizationError{message: "Unexpected end of input while processing block comment".to_string(), index: start_idx, source: self.text})
+                                            return Err(self.make_error("Unexpected end of input while processing block comment".to_string(), start_idx))
                                         },
                                         Some((next_peeked_idx, next_peeked_char)) => {
                                             match next_peeked_char {
@@ -372,7 +387,7 @@ impl <'input> Tokenizer<'input> {
         }
     }
 
-    fn next_token(&mut self) -> Result<TokenSpan, TokenizationError<'input>> {
+    fn next_token(&mut self) -> Result<TokenSpan, TokenizationError> {
         let maybe_last = self.lookahead;
         let maybe_next = self.advance();
         match maybe_next {
@@ -409,7 +424,7 @@ impl <'input> Tokenizer<'input> {
                         match next_next {
                             '/' | '*' => self.process_comment(),
                             _ => {
-                                return Err(TokenizationError{message: "unexpected token '/'".to_string(), index: next_idx, source: self.text})
+                                return Err(self.make_error("unexpected token '/'".to_string(), next_idx))
                             }
                         }
                     }
@@ -419,7 +434,7 @@ impl <'input> Tokenizer<'input> {
         }
     }
 
-    fn tokenize(&mut self) -> Result<Tokens<'input>, TokenizationError<'input>> {
+    fn tokenize(&mut self) -> Result<Tokens<'input>, TokenizationError> {
         let mut tokens: Vec<TokenSpan> = Vec::new();
         loop {
             let tok = self.next_token()?;
