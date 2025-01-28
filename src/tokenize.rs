@@ -53,12 +53,12 @@ impl<'input> Tokens<'input> {
 }
 
 #[derive(Debug)]
-struct TokenizationError {
+pub (crate) struct TokenizationError {
     message: String,
     index: usize, // byte offset
-    lineno: usize,
-    colno: usize,
-    char_index: usize // char offset
+    pub(crate) lineno: usize,
+    pub(crate) colno: usize,
+    pub(crate) char_index: usize // char offset
 }
 
 impl<'input> Display for TokenizationError {
@@ -68,7 +68,7 @@ impl<'input> Display for TokenizationError {
 }
 
 #[derive(Debug)]
-struct Tokenizer<'input> {
+pub(crate) struct Tokenizer<'input> {
     include_whitespace: bool,
     text: &'input str,
     chars: Peekable<CharIndices<'input>>,
@@ -77,10 +77,10 @@ struct Tokenizer<'input> {
 
 
 const HEX_CHARS: &str = "0123456789abcdefABCDEF";
-
+const IDENTIFIER_SYMBOLS: &str = "$_";
 
 impl <'input> Tokenizer<'input> {
-    fn new(text: &'input str) -> Self {
+    pub(crate) fn new(text: &'input str) -> Self {
         Tokenizer {include_whitespace: false, text: text, chars: text.char_indices().peekable(), lookahead: None}
     }
     fn with_whitespace(text: &'input str) -> Self {
@@ -122,7 +122,7 @@ impl <'input> Tokenizer<'input> {
                         '\n' | '\r' | '\u{2028}' | '\u{2029}' => {
                             if last_char != '\\' {
                                 let (lineno, colno, char_index) = get_line_col_char(self.text, start_idx);
-                                break Err(self.make_error("Unexpected line terminator without continuation in string literal started at".to_string(), start_idx))
+                                break Err(self.make_error("Unexpected line terminator without continuation in string literal at".to_string(), idx))
                             }
                             last_char = char;
                             continue
@@ -160,7 +160,8 @@ impl <'input> Tokenizer<'input> {
     }
 
     fn process_octal(&mut self) -> Result<TokenSpan, TokenizationError> {
-        todo!()
+        let (start_idx, start_char) = self.lookahead.expect("Unexpected end of input, was processing octal");
+        Err(self.make_error("Octals are forbidden".to_string(), start_idx))
     }
 
     fn process_hexadecimal(&mut self) -> Result<TokenSpan, TokenizationError> {
@@ -170,17 +171,27 @@ impl <'input> Tokenizer<'input> {
         if x_char != 'x' && x_char != 'X' {
             panic!("Invalid hexadecimal here")
         }
-        let (mut last_idx, first_digit) = self.advance().expect("Expected at least one digit in hex"); // todo: make this a tokenization error
-        assert!(HEX_CHARS.contains(first_digit)); // todo: make this a tokenization error
-        loop {
-            match self.advance() {
-                None => break Ok((start_idx, TokType::Hexadecimal, last_idx+1)),
-                Some((offset, char)) => {
-                    if !HEX_CHARS.contains(char) {
-                        break Err(self.make_error(format!("invalid character ({:?}) in hexadecimal literal starting at", char), start_idx))
+
+        match self.advance() {
+            None => {
+                return Err(self.make_error("Expected at least one digit in hexadecimal literal".to_string(), start_idx))
+            }
+            Some((mut last_idx, first_digit)) => {
+                if !HEX_CHARS.contains(first_digit) {
+                    return Err(self.make_error(format!("Invalid hexadecimal character {:?} in literal starting at", first_digit), start_idx))
+                }
+                loop {
+                    match self.chars.peek() {
+                        None => break Ok((start_idx, TokType::Hexadecimal, last_idx+1)),
+                        Some((offset, char)) => {
+                            if !HEX_CHARS.contains(*char) {
+                                break Ok((start_idx, TokType::Hexadecimal, last_idx+1))
+                            }
+                            last_idx = *offset;
+                            self.advance();
+                            continue
+                        }
                     }
-                    last_idx = offset;
-                    continue
                 }
             }
         }
@@ -208,18 +219,26 @@ impl <'input> Tokenizer<'input> {
         let mut decimal_seen: bool = false;
         let mut exponent_seen: bool = false;
         let mut unary_seen: bool = false;
+        match start_char {
+            '.' => {decimal_seen = true}
+            '+' | '-' => {unary_seen = true}
+            _ => {}
+        }
         loop {
             match self.chars.peek() {
                 None => {
-                    if unary_seen || decimal_seen || exponent_seen {
+                    if unary_seen || exponent_seen {
                         let (_, last_char) = self.lookahead.unwrap();
-                        if "+-eE.".contains(last_char) {
+                        if "+-eE".contains(last_char) {
                             return Err(self.make_error(format!("Invalid number literal (missing digit after {:?})", last_char), start_idx))
                         }
                     }
                     if exponent_seen {
                         break Ok((start_idx, TokType::Exponent, last_index+1))
                     } else if decimal_seen {
+                        if start_idx == last_index {
+                            return Err(self.make_error("Lone decimal is an invalid number literal".to_string(), start_idx))
+                        }
                         break Ok((start_idx, TokType::Float, last_index+1))
                     } else {
                         break Ok((start_idx, TokType::Integer, last_index+1))
@@ -237,6 +256,9 @@ impl <'input> Tokenizer<'input> {
                                 return Err(self.make_error("Invalid number literal (unexpected decimal)".to_string(), start_idx))
                             }
                             decimal_seen = true;
+                            if exponent_seen {
+                                return Err(self.make_error("Invalid exponent literal (float exponents forbidden) at".to_string(), start_idx))
+                            }
                             last_index = *next_idx;
                             self.advance();
                             continue
@@ -263,15 +285,20 @@ impl <'input> Tokenizer<'input> {
                             }
                         }
                         _ => {
-                            if unary_seen || decimal_seen || exponent_seen {
+                            // The peeked character can't be part of a number
+                            // Verify the number is valid
+                            if unary_seen || exponent_seen {
                                 let (_, last_char) = self.lookahead.unwrap();
-                                if "+-eE.".contains(last_char) {
+                                if "+-eE".contains(last_char) {
                                     return Err(self.make_error(format!("Invalid number literal (missing digit after {:?})", last_char), start_idx))
                                 }
                             }
                             if exponent_seen {
                                 break Ok((start_idx, TokType::Exponent, last_index+1))
                             } else if decimal_seen {
+                                if start_idx == last_index {
+                                    return Err(self.make_error("Lone decimal is an invalid number literal".to_string(), start_idx))
+                                }
                                 break Ok((start_idx, TokType::Float, last_index+1))
                             } else {
                                 break Ok((start_idx, TokType::Integer, last_index+1))
@@ -314,9 +341,13 @@ impl <'input> Tokenizer<'input> {
                         last_idx = *next_idx;
                         self.advance();
                         continue
+                    } else if IDENTIFIER_SYMBOLS.contains(*next_char) {
+                        last_idx = *next_idx;
+                        self.advance();
+                        continue
                     } else {
                         break self.tok_from_indices(start_idx, last_idx + 1)
-                    }
+                    } // TODO: handle unicode escape sequences
                 }
             }
         }
@@ -335,6 +366,7 @@ impl <'input> Tokenizer<'input> {
                         Some((peeked_idx, peeked_char)) => {
                             match peeked_char {
                                 '\n' | '\r' | '\u{2028}' | '\u{2029}' => {
+                                    (last_idx, _) = self.advance().unwrap();
                                     return Ok((start_idx, TokType::LineComment, last_idx))
                                 }
                                 _ => {
@@ -435,7 +467,7 @@ impl <'input> Tokenizer<'input> {
         }
     }
 
-    fn tokenize(&mut self) -> Result<Tokens<'input>, TokenizationError> {
+    pub(crate) fn tokenize(&mut self) -> Result<Tokens<'input>, TokenizationError> {
         let mut tokens: Vec<TokenSpan> = Vec::new();
         loop {
             let tok = self.next_token()?;

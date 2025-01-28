@@ -30,12 +30,13 @@ struct Unary {
 enum JSONValue {
     JSONObject { key_value_pairs: Vec<JSONKeyValuePair> },
     JSONArray { values: Vec<JSONValue> },
-    Integer(isize),
-    Float(f64), // also covers exponent
+    Integer(String),
+    Float(String),
     Exponent(String),
     Null,
     Infinity,
     NaN,
+    Hexadecimal(String),
     Bool(bool),
     DoubleQuotedString(String),
     SingleQuotedString(String),
@@ -97,8 +98,21 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
         }
     }
 
-    fn peek(&mut self) -> Option<&(&'toks TokenSpan, &'input str)> {
-        self.source_tokens.peek()
+    fn peek(&mut self) -> Option<(&'toks TokenSpan, &'input str)> {
+        match self.source_tokens.peek() {
+            None => None,
+            Some((span, lexeme)) => {
+                match span.1 {
+                    TokType::BlockComment | TokType::LineComment | TokType::Whitespace => {
+                        self.source_tokens.next();
+                        return self.peek()
+                    }
+                    _ => {
+                        Some((span, lexeme))
+                    }
+                }
+            }
+        }
     }
 
     fn position(&mut self) -> usize {
@@ -179,7 +193,16 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                             kvps.push(kvp);
                             match self.check_and_consume(vec![Comma]) {
                                 None => {
-                                    break Ok(JSONValue::JSONObject {key_value_pairs: kvps})
+                                    match self.check_and_consume(vec![RightBrace]) {
+                                        None => {
+                                            let idx = self.position();
+                                            return Err(self.make_error("Expecting '}' at end of object".to_string(), idx))
+                                        },
+                                        Some(_) => {
+                                            break Ok(JSONValue::JSONObject {key_value_pairs: kvps})
+                                        }
+                                    }
+
                                 }
                                 Some(_) => {
                                     continue
@@ -204,7 +227,15 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                     values.push(val);
                     match self.check_and_consume(vec![Comma]) {
                         None => {
-                            break Ok(JSONValue::JSONArray {values: values})
+                            match self.check_and_consume(vec![TokType::RightBracket]) {
+                                None => {
+                                    let idx = self.position();
+                                    return Err(self.make_error("Expecting ']' at end of array".to_string(), idx))
+                                },
+                                Some(_) => {
+                                    break Ok(JSONValue::JSONArray {values: values})
+                                }
+                            }
                         }
                         Some(_) => {
                             continue
@@ -221,27 +252,9 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
     fn parse_primary(&mut self) -> Result<JSONValue, ParsingError> {
         let (span, lexeme) = self.advance().unwrap();
         match &span.1 {
-            TokType::Integer => {
-                let maybe_i: Result<isize, _> = lexeme.parse();
-                match maybe_i {
-                    Err(parse_err) => {
-                        Err(self.make_error(format!("Unable to parse {:?} as integer", lexeme), span.0))
-                    }
-                    Ok(i) => { Ok(JSONValue::Integer(i)) }
-                }
-            }
-            TokType::Float => {
-                let maybe_f: Result<f64, _> = lexeme.parse();
-                match maybe_f {
-                    Err(parse_err) => {
-                        Err(self.make_error(format!("Unable to parse {:?} as float", lexeme), span.0))
-                    }
-                    Ok(f) => { Ok(JSONValue::Float(f)) }
-                }
-            }
-            TokType::Exponent => {
-                todo!()
-            }
+            TokType::Integer => {Ok(JSONValue::Integer(lexeme.to_string()))}
+            TokType::Float => {Ok(JSONValue::Float(lexeme.to_string()))}
+            TokType::Exponent => { Ok(JSONValue::Exponent(lexeme.to_string()))}
             TokType::SingleQuotedString => Ok(JSONValue::SingleQuotedString(lexeme[1..lexeme.len() - 1].to_string())),
             TokType::DoubleQuotedString => Ok(JSONValue::DoubleQuotedString(lexeme[1..lexeme.len() - 1].to_string())),
             TokType::True => Ok(JSONValue::Bool(true)),
@@ -249,8 +262,14 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
             TokType::Null => Ok(JSONValue::Null),
             TokType::Infinity => Ok(JSONValue::Infinity),
             TokType::Nan => Ok(JSONValue::NaN),
-            TokType::Hexadecimal => todo!(),
-            t => panic!("Unexpected token of type {:?}: {:?}", t, lexeme)
+            TokType::Hexadecimal => Ok(JSONValue::Hexadecimal(lexeme.to_string())),
+            TokType::EOF => {
+                match self.position() {
+                    0 => Err(self.make_error("Unexpected EOF. Was expecting value.".to_string(), 0)),
+                    _ => Err(self.make_error("Unexpected EOF".to_string(), span.0 - 1))
+                }
+            },
+            t => Err(self.make_error(format!("Unexpected token of type {:?}: {:?}", t, lexeme), span.0))
         }
     }
 
@@ -293,6 +312,14 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
 
     fn parse_text(&mut self) -> Result<JSONText, ParsingError> {
         let value = self.parse_value()?;
+        match self.advance() {
+            None => {}
+            Some((span, lexeme)) => {
+                if span.1 != TokType::EOF {
+                    return Err(self.make_error(format!("Unexpected {:?} token after value", span.1), span.0 - 1))
+                }
+            }
+        }
         Ok(JSONText { value: value })
     }
 }
@@ -310,6 +337,7 @@ fn parse_text(source: &str) -> Result<JSONText, ParsingError> {
 
 #[cfg(test)]
 mod tests {
+    use crate::tokenize::Tokenizer;
     use crate::parser::JSONValue::*;
     use super::*;
     #[test]
@@ -336,21 +364,21 @@ mod tests {
     #[test]
     fn test_array() {
         let res = parse_text("[1,2,3]").unwrap();
-        let expected = JSONText{value: JSONArray {values: vec![JSONValue::Integer(1), JSONValue::Integer(2), JSONValue::Integer(3)]}};
+        let expected = JSONText{value: JSONArray {values: vec![JSONValue::Integer("1".to_string()), JSONValue::Integer("2".to_string()), JSONValue::Integer("3".to_string())]}};
         assert_eq!(res, expected)
     }
 
     #[test]
     fn val_int() {
         let res = parse_text("1").unwrap();
-        let expected = JSONText{value: Integer(1)};
+        let expected = JSONText{value: Integer("1".to_string())};
         assert_eq!(res, expected)
     }
 
     #[test]
     fn val_float() {
         let res = parse_text("1.0").unwrap();
-        let expected = JSONText{value: Float(1.0)};
+        let expected = JSONText{value: Float("1.0".to_string())};
         assert_eq!(res, expected)
     }
 
@@ -370,7 +398,7 @@ mod tests {
     #[test]
     fn test_single_element_array() {
         let res = parse_text("[42]").unwrap();
-        let expected = JSONText { value: JSONArray { values: vec![Integer(42)] } };
+        let expected = JSONText { value: JSONArray { values: vec![Integer("42".to_string())] } };
         assert_eq!(res, expected);
     }
 
@@ -395,7 +423,7 @@ mod tests {
         let res = parse_text("[1, 2, 3,]").unwrap();
         let expected = JSONText {
             value: JSONArray {
-                values: vec![Integer(1), Integer(2), Integer(3)]
+                values: vec![Integer("1".to_string()), Integer("2".to_string()), Integer("3".to_string())]
             }
         };
         assert_eq!(res, expected);
@@ -409,11 +437,11 @@ mod tests {
                 key_value_pairs: vec![
                     JSONKeyValuePair {
                         key: DoubleQuotedString("a".to_string()),
-                        value: Integer(1),
+                        value: Integer("1".to_string()),
                     },
                     JSONKeyValuePair {
                         key: DoubleQuotedString("b".to_string()),
-                        value: Integer(2),
+                        value: Integer("2".to_string()),
                     }
                 ]
             }
@@ -456,10 +484,1493 @@ mod tests {
         let expected = JSONText {
             value: JSONArray {
                 values: vec![
-                    JSONArray { values: vec![Integer(1), Integer(2)] }
+                    JSONArray { values: vec![Integer("1".to_string()), Integer("2".to_string())] }
                 ]
             }
         };
         assert_eq!(res, expected);
     }
+
+    // Start Auto-generated tests
+    #[test]
+    fn test_empty_array() {
+        let sample = r#"[]"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_leading_comma_array() {
+        let sample = r#"[
+    ,null
+]"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_lone_trailing_comma_array() {
+        let sample = r#"[
+    ,
+]"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_no_comma_array() {
+        let sample = r#"[
+    true
+    false
+]"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_regular_array() {
+        let sample = r#"[
+    true,
+    false,
+    null
+]"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_trailing_comma_array() {
+        let sample = r#"[
+    null,
+]"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_block_comment_following_array_element() {
+        let sample = r#"[
+    false
+    /*
+        true
+    */
+]"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_block_comment_following_top_level_value() {
+        let sample = r#"null
+/*
+    Some non-comment top-level value is needed;
+    we use null above.
+*/"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_block_comment_in_string() {
+        let sample = r#""This /* block comment */ isn't really a block comment.""#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_block_comment_preceding_top_level_value() {
+        let sample = r#"/*
+    Some non-comment top-level value is needed;
+    we use null below.
+*/
+null"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_block_comment_with_asterisks() {
+        let sample = r#"/**
+ * This is a JavaDoc-like block comment.
+ * It contains asterisks inside of it.
+ * It might also be closed with multiple asterisks.
+ * Like this:
+ **/
+true"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_inline_comment_following_array_element() {
+        let sample = r#"[
+    false   // true
+]"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_inline_comment_following_top_level_value() {
+        let sample = r#"null // Some non-comment top-level value is needed; we use null here."#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_inline_comment_in_string() {
+        let sample = r#""This inline comment // isn't really an inline comment.""#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_inline_comment_preceding_top_level_value() {
+        let sample = r#"// Some non-comment top-level value is needed; we use null below.
+null"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_top_level_block_comment() {
+        let sample = r#"/*
+    This should fail;
+    comments cannot be the only top-level value.
+*/"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_top_level_inline_comment() {
+        let sample = r#"// This should fail; comments cannot be the only top-level value."#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_unterminated_block_comment() {
+        let sample = r#"true
+/*
+    This block comment doesn't terminate.
+    There was a legitimate value before this,
+    but this is still invalid JS/JSON5.
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_empty() {
+        let sample = r#""#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_npm_package() {
+        let sample = r#"{
+  "name": "npm",
+  "publishConfig": {
+    "proprietary-attribs": false
+  },
+  "description": "A package manager for node",
+  "keywords": [
+    "package manager",
+    "modules",
+    "install",
+    "package.json"
+  ],
+  "version": "1.1.22",
+  "preferGlobal": true,
+  "config": {
+    "publishtest": false
+  },
+  "homepage": "http://npmjs.org/",
+  "author": "Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/isaacs/npm"
+  },
+  "bugs": {
+    "email": "npm-@googlegroups.com",
+    "url": "http://github.com/isaacs/npm/issues"
+  },
+  "directories": {
+    "doc": "./doc",
+    "man": "./man",
+    "lib": "./lib",
+    "bin": "./bin"
+  },
+  "main": "./lib/npm.js",
+  "bin": "./bin/npm-cli.js",
+  "dependencies": {
+    "semver": "~1.0.14",
+    "ini": "1",
+    "slide": "1",
+    "abbrev": "1",
+    "graceful-fs": "~1.1.1",
+    "minimatch": "~0.2",
+    "nopt": "1",
+    "node-uuid": "~1.3",
+    "proto-list": "1",
+    "rimraf": "2",
+    "request": "~2.9",
+    "which": "1",
+    "tar": "~0.1.12",
+    "fstream": "~0.1.17",
+    "block-stream": "*",
+    "inherits": "1",
+    "mkdirp": "0.3",
+    "read": "0",
+    "lru-cache": "1",
+    "node-gyp": "~0.4.1",
+    "fstream-npm": "0 >=0.0.5",
+    "uid-number": "0",
+    "archy": "0",
+    "chownr": "0"
+  },
+  "bundleDependencies": [
+    "slide",
+    "ini",
+    "semver",
+    "abbrev",
+    "graceful-fs",
+    "minimatch",
+    "nopt",
+    "node-uuid",
+    "rimraf",
+    "request",
+    "proto-list",
+    "which",
+    "tar",
+    "fstream",
+    "block-stream",
+    "inherits",
+    "mkdirp",
+    "read",
+    "lru-cache",
+    "node-gyp",
+    "fstream-npm",
+    "uid-number",
+    "archy",
+    "chownr"
+  ],
+  "devDependencies": {
+    "ronn": "https://github.com/isaacs/ronnjs/tarball/master"
+  },
+  "engines": {
+    "node": "0.6 || 0.7 || 0.8",
+    "npm": "1"
+  },
+  "scripts": {
+    "test": "node ./test/run.js",
+    "prepublish": "npm prune; rm -rf node_modules/*/{test,example,bench}*; make -j4 doc",
+    "dumpconf": "env | grep npm | sort | uniq"
+  },
+  "licenses": [
+    {
+      "type": "MIT +no-false-attribs",
+      "url": "http://github.com/isaacs/npm/raw/master/LICENSE"
+    }
+  ]
+}
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_npm_package2() {
+        let sample = r#"{
+  name: 'npm',
+  publishConfig: {
+    'proprietary-attribs': false,
+  },
+  description: 'A package manager for node',
+  keywords: [
+    'package manager',
+    'modules',
+    'install',
+    'package.json',
+  ],
+  version: '1.1.22',
+  preferGlobal: true,
+  config: {
+    publishtest: false,
+  },
+  homepage: 'http://npmjs.org/',
+  author: 'Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)',
+  repository: {
+    type: 'git',
+    url: 'https://github.com/isaacs/npm',
+  },
+  bugs: {
+    email: 'npm-@googlegroups.com',
+    url: 'http://github.com/isaacs/npm/issues',
+  },
+  directories: {
+    doc: './doc',
+    man: './man',
+    lib: './lib',
+    bin: './bin',
+  },
+  main: './lib/npm.js',
+  bin: './bin/npm-cli.js',
+  dependencies: {
+    semver: '~1.0.14',
+    ini: '1',
+    slide: '1',
+    abbrev: '1',
+    'graceful-fs': '~1.1.1',
+    minimatch: '~0.2',
+    nopt: '1',
+    'node-uuid': '~1.3',
+    'proto-list': '1',
+    rimraf: '2',
+    request: '~2.9',
+    which: '1',
+    tar: '~0.1.12',
+    fstream: '~0.1.17',
+    'block-stream': '*',
+    inherits: '1',
+    mkdirp: '0.3',
+    read: '0',
+    'lru-cache': '1',
+    'node-gyp': '~0.4.1',
+    'fstream-npm': '0 >=0.0.5',
+    'uid-number': '0',
+    archy: '0',
+    chownr: '0',
+  },
+  bundleDependencies: [
+    'slide',
+    'ini',
+    'semver',
+    'abbrev',
+    'graceful-fs',
+    'minimatch',
+    'nopt',
+    'node-uuid',
+    'rimraf',
+    'request',
+    'proto-list',
+    'which',
+    'tar',
+    'fstream',
+    'block-stream',
+    'inherits',
+    'mkdirp',
+    'read',
+    'lru-cache',
+    'node-gyp',
+    'fstream-npm',
+    'uid-number',
+    'archy',
+    'chownr',
+  ],
+  devDependencies: {
+    ronn: 'https://github.com/isaacs/ronnjs/tarball/master',
+  },
+  engines: {
+    node: '0.6 || 0.7 || 0.8',
+    npm: '1',
+  },
+  scripts: {
+    test: 'node ./test/run.js',
+    prepublish: 'npm prune; rm -rf node_modules/*/{test,example,bench}*; make -j4 doc',
+    dumpconf: 'env | grep npm | sort | uniq',
+  },
+  licenses: [
+    {
+      type: 'MIT +no-false-attribs',
+      url: 'http://github.com/isaacs/npm/raw/master/LICENSE',
+    },
+  ],
+}
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_readme_example() {
+        let sample = r#"{
+    foo: 'bar',
+    while: true,
+
+    this: 'is a \
+multi-line string',
+
+    // this is an inline comment
+    here: 'is another', // inline comment
+
+    /* this is a block comment
+       that continues on another line */
+
+    hex: 0xDEADbeef,
+    half: .5,
+    delta: +10,
+    to: Infinity,   // and beyond!
+
+    finally: 'a trailing comma',
+    oh: [
+        "we shouldn't forget",
+        'arrays can have',
+        'trailing commas too',
+    ],
+}
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_valid_whitespace() {
+        let sample = r#"{
+    // An invalid form feed character (\x0c) has been entered before this comment.
+    // Be careful not to delete it.
+  "a": true
+}
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_comment_cr() {
+        let sample = r#"{
+    // This comment is terminated with `\r`.
+}
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_comment_crlf() {
+        let sample = r#"{
+    // This comment is terminated with `\r\n`.
+}
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_comment_lf() {
+        let sample = r#"{
+    // This comment is terminated with `\n`.
+}
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_escaped_cr() {
+        let sample = r#"{
+    // the following string contains an escaped `\r`
+    a: 'line 1 \
+line 2'
+}
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_escaped_crlf() {
+        let sample = r#"{
+    // the following string contains an escaped `\r\n`
+    a: 'line 1 \
+line 2'
+}
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_escaped_lf() {
+        let sample = r#"{
+    // the following string contains an escaped `\n`
+    a: 'line 1 \
+line 2'
+}
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_float_leading_decimal_point() {
+        let sample = r#".5
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_float_leading_zero() {
+        let sample = r#"0.5
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_float_trailing_decimal_point_with_integer_exponent() {
+        let sample = r#"5.e4
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_float_trailing_decimal_point() {
+        let sample = r#"5.
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_float_with_integer_exponent() {
+        let sample = r#"1.2e3
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_float() {
+        let sample = r#"1.2
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_hexadecimal_empty() {
+        let sample = r#"0x
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_hexadecimal_lowercase_letter() {
+        let sample = r#"0xc8
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_hexadecimal_uppercase_x() {
+        let sample = r#"0XC8
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_hexadecimal_with_integer_exponent() {
+        let sample = r#"0xc8e4
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_hexadecimal() {
+        let sample = r#"0xC8
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_infinity() {
+        let sample = r#"Infinity
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_integer_with_float_exponent() {
+        let sample = r#"1e2.3
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err(), "{:?}", res.unwrap());
+        }
+    }
+
+
+    #[test]
+    fn test_integer_with_hexadecimal_exponent() {
+        let sample = r#"1e0x4
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_integer_with_integer_exponent() {
+        let sample = r#"2e23
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_integer_with_negative_float_exponent() {
+        let sample = r#"1e-2.3
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_integer_with_negative_hexadecimal_exponent() {
+        let sample = r#"1e-0x4
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err(), "{:?}", res.unwrap());
+        }
+    }
+
+
+    #[test]
+    fn test_integer_with_negative_integer_exponent() {
+        let sample = r#"2e-23
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_integer_with_negative_zero_integer_exponent() {
+        let sample = r#"5e-0
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_integer_with_positive_float_exponent() {
+        let sample = r#"1e+2.3
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_integer_with_positive_hexadecimal_exponent() {
+        let sample = r#"1e+0x4
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_integer_with_positive_integer_exponent() {
+        let sample = r#"1e+2
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_integer_with_positive_zero_integer_exponent() {
+        let sample = r#"5e+0
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_integer_with_zero_integer_exponent() {
+        let sample = r#"5e0
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_integer() {
+        let sample = r#"15
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_lone_decimal_point() {
+        let sample = r#".
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err(), "{:?}", res.unwrap());
+        }
+    }
+
+
+    #[test]
+    fn test_nan() {
+        let sample = r#"NaN
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_negative_float_leading_decimal_point() {
+        let sample = r#"-.5
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_negative_float_leading_zero() {
+        let sample = r#"-0.5
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_negative_float_trailing_decimal_point() {
+        let sample = r#"-5.
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_negative_float() {
+        let sample = r#"-1.2
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_negative_hexadecimal() {
+        let sample = r#"-0xC8
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_negative_infinity() {
+        let sample = r#"-Infinity
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_negative_integer() {
+        let sample = r#"-15
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_negative_noctal() {
+        let sample = r#"-098
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_negative_octal() {
+        let sample = r#"-0123
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_negative_zero_float_leading_decimal_point() {
+        let sample = r#"-.0
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_negative_zero_float_trailing_decimal_point() {
+        let sample = r#"-0.
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_negative_zero_float() {
+        let sample = r#"-0.0
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_negative_zero_hexadecimal() {
+        let sample = r#"-0x0
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_negative_zero_integer() {
+        let sample = r#"-0
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_negative_zero_octal() {
+        let sample = r#"-00
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_noctal_with_leading_octal_digit() {
+        let sample = r#"0780
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_noctal() {
+        let sample = r#"080
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_octal() {
+        let sample = r#"010
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_positive_float_leading_decimal_point() {
+        let sample = r#"+.5
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_positive_float_leading_zero() {
+        let sample = r#"+0.5
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_positive_float_trailing_decimal_point() {
+        let sample = r#"+5.
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_positive_float() {
+        let sample = r#"+1.2
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_positive_hexadecimal() {
+        let sample = r#"+0xC8
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_positive_infinity() {
+        let sample = r#"+Infinity
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_positive_integer() {
+        let sample = r#"+15
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_positive_noctal() {
+        let sample = r#"+098
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_positive_octal() {
+        let sample = r#"+0123
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_positive_zero_float_leading_decimal_point() {
+        let sample = r#"+.0
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_positive_zero_float_trailing_decimal_point() {
+        let sample = r#"+0.
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_positive_zero_float() {
+        let sample = r#"+0.0
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_positive_zero_hexadecimal() {
+        let sample = r#"+0x0
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_positive_zero_integer() {
+        let sample = r#"+0
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_positive_zero_octal() {
+        let sample = r#"+00
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_zero_float_leading_decimal_point() {
+        let sample = r#".0
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_zero_float_trailing_decimal_point() {
+        let sample = r#"0.
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_zero_float() {
+        let sample = r#"0.0
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_zero_hexadecimal() {
+        let sample = r#"0x0
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_zero_integer_with_integer_exponent() {
+        let sample = r#"0e23
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_zero_integer() {
+        let sample = r#"0
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_zero_octal() {
+        let sample = r#"00
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_duplicate_keys() {
+        let sample = r#"{
+    "a": true,
+    "a": false
+}
+"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_empty_object() {
+        let sample = r#"{}"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_illegal_unquoted_key_number() {
+        let sample = r#"{
+    10twenty: "ten twenty"
+}"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_illegal_unquoted_key_symbol() {
+        let sample = r#"{
+    multi-word: "multi-word"
+}"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_leading_comma_object() {
+        let sample = r#"{
+    ,"foo": "bar"
+}"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_lone_trailing_comma_object() {
+        let sample = r#"{
+    ,
+}"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_no_comma_object() {
+        let sample = r#"{
+    "foo": "bar"
+    "hello": "world"
+}"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
+    #[test]
+    fn test_reserved_unquoted_key() {
+        let sample = r#"{
+    while: true
+}"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_single_quoted_key() {
+        let sample = r#"{
+    'hello': "world"
+}"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_trailing_comma_object() {
+        let sample = r#"{
+    "foo": "bar",
+}"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_unquoted_keys() {
+        let sample = r#"{
+    hello: "world",
+    _: "underscore",
+    $: "dollar sign",
+    one1: "numerals",
+    _$_: "multiple symbols",
+    $_$hello123world_$_: "mixed"
+}"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_escaped_single_quoted_string() {
+        let sample = r#"'I can\'t wait'"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_multi_line_string() {
+        let sample = r#"'hello\
+ world'"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_single_quoted_string() {
+        let sample = r#"'hello world'"#;
+        let res = parse_text(sample).unwrap();
+    }
+
+
+
+    #[test]
+    fn test_unescaped_multi_line_string() {
+        let sample = r#""foo
+bar"
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            return
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            assert!(res.is_err());
+        }
+    }
+
+
 }
