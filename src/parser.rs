@@ -500,6 +500,8 @@ mod tests {
     }
 
     // Start Auto-generated tests
+    // The following test cases are largely pulled from the json5-tests project https://github.com/json5/json5-tests
+    // Used under MIT license  https://github.com/json5/json5-tests/blob/c9af328e6d77286d78b77b520c4622d588b544c0/LICENSE.md
     #[test]
     fn test_empty_array() {
         let sample = r#"[]"#;
