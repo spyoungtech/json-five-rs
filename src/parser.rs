@@ -45,7 +45,7 @@ enum JSONValue {
 }
 
 #[derive(PartialEq, Debug)]
-struct JSONText {
+pub(crate) struct JSONText {
     value: JSONValue,
 }
 
@@ -266,7 +266,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
             TokType::EOF => {
                 match self.position() {
                     0 => Err(self.make_error("Unexpected EOF. Was expecting value.".to_string(), 0)),
-                    _ => Err(self.make_error("Unexpected EOF".to_string(), span.0 - 1))
+                    pos => Err(self.make_error("Unexpected EOF".to_string(), pos-1))
                 }
             },
             t => Err(self.make_error(format!("Unexpected token of type {:?}: {:?}", t, lexeme), span.0))
@@ -388,6 +388,14 @@ mod tests {
         let expected = JSONText{value: SingleQuotedString("foo".to_string())};
         assert_eq!(res, expected)
     }
+
+    #[test]
+    fn multiline_string() {
+        let res = parse_text("'foo\\\nbar'").unwrap();
+        let expected = JSONText{value: SingleQuotedString("foo\\\nbar".to_string())};
+        assert_eq!(res, expected)
+    }
+
     #[test]
     fn test_empty_string() {
         let res = parse_text("\"\"").unwrap();
@@ -496,6 +504,8 @@ mod tests {
     fn test_empty_array() {
         let sample = r#"[]"#;
         let res = parse_text(sample).unwrap();
+        let expected = JSONText{ value: JSONArray {values: vec![]}};
+        assert_eq!(res, expected)
     }
 
 
@@ -1969,6 +1979,386 @@ bar"
             let toks = maybe_tokens.unwrap();
             let res = parse(&toks);
             assert!(res.is_err());
+        }
+    }
+    // Start error tests
+
+
+
+    #[test]
+    fn test_error_no_comma_array_lineno() {
+        let sample = r#"[
+    true
+    false
+]"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.lineno, 3_usize, "{:?}", err);
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.lineno, 3_usize, "{:?}", err);
+        }
+    }
+
+
+    #[test]
+    fn test_error_no_comma_array_index() {
+        let sample = r#"[
+    true
+    false
+]"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.char_index, 15_usize, "{:?}", err)
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.char_index, 15_usize, "{:?}", err);
+        }
+    }
+
+    #[test]
+    fn test_error_no_comma_array_colno() {
+        let sample = r#"[
+    true
+    false
+]"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.colno, 5_usize, "{:?}", err);
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.colno, 5_usize, "{:?}", err);
+        }
+    }
+
+
+    #[test]
+    fn test_error_top_level_block_comment_lineno() {
+        let sample = r#"/*
+    This should fail;
+    comments cannot be the only top-level value.
+*/"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.lineno, 4_usize, "{:?}", err);
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.lineno, 4_usize, "{:?}", err);
+        }
+    }
+
+
+    #[test]
+    #[ignore]
+    fn test_error_top_level_block_comment_index() {
+        let sample = r#"/*
+    This should fail;
+    comments cannot be the only top-level value.
+*/"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.char_index, 76_usize, "{:?}", err)
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.char_index, 76_usize, "{:?}", err);
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_error_top_level_block_comment_colno() {
+        let sample = r#"/*
+    This should fail;
+    comments cannot be the only top-level value.
+*/"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.colno, 3_usize, "{:?}", err);
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.colno, 3_usize, "{:?}", err);
+        }
+    }
+
+
+
+    #[test]
+    fn test_error_top_level_inline_comment_lineno() {
+        let sample = r#"// This should fail; comments cannot be the only top-level value."#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.lineno, 1_usize, "{:?}", err);
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.lineno, 1_usize, "{:?}", err);
+        }
+    }
+
+
+    #[test]
+    #[ignore]
+    fn test_error_top_level_inline_comment_index() {
+        let sample = r#"// This should fail; comments cannot be the only top-level value."#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.char_index, 65_usize, "{:?}", err)
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.char_index, 65_usize, "{:?}", err);
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_error_top_level_inline_comment_colno() {
+        let sample = r#"// This should fail; comments cannot be the only top-level value."#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.colno, 66_usize, "{:?}", err);
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.colno, 66_usize, "{:?}", err);
+        }
+    }
+
+    #[test]
+    fn test_error_illegal_unquoted_key_number_lineno() {
+        let sample = r#"{
+    10twenty: "ten twenty"
+}"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.lineno, 2_usize, "{:?}", err);
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.lineno, 2_usize, "{:?}", err);
+        }
+    }
+
+
+    #[test]
+    #[ignore]
+    fn test_error_illegal_unquoted_key_number_index() {
+        let sample = r#"{
+    10twenty: "ten twenty"
+}"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.char_index, 6_usize, "{:?}", err)
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.char_index, 6_usize, "{:?}", err);
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_error_illegal_unquoted_key_number_colno() {
+        let sample = r#"{
+    10twenty: "ten twenty"
+}"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.colno, 5_usize, "{:?}", err);
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.colno, 5_usize, "{:?}", err);
+        }
+    }
+
+
+
+    #[test]
+    fn test_error_illegal_unquoted_key_symbol_lineno() {
+        let sample = r#"{
+    multi-word: "multi-word"
+}"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.lineno, 2_usize, "{:?}", err);
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.lineno, 2_usize, "{:?}", err);
+        }
+    }
+
+
+    #[test]
+    fn test_error_illegal_unquoted_key_symbol_index() {
+        let sample = r#"{
+    multi-word: "multi-word"
+}"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.char_index, 11_usize, "{:?}", err)
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.char_index, 11_usize, "{:?}", err);
+        }
+    }
+
+    #[test]
+    fn test_error_illegal_unquoted_key_symbol_colno() {
+        let sample = r#"{
+    multi-word: "multi-word"
+}"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.colno, 10_usize, "{:?}", err);
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.colno, 10_usize, "{:?}", err);
+        }
+    }
+
+
+
+    #[test]
+    fn test_error_leading_comma_object_lineno() {
+        let sample = r#"{
+    ,"foo": "bar"
+}"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.lineno, 2_usize, "{:?}", err);
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.lineno, 2_usize, "{:?}", err);
+        }
+    }
+
+
+    #[test]
+    fn test_error_leading_comma_object_index() {
+        let sample = r#"{
+    ,"foo": "bar"
+}"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.char_index, 6_usize, "{:?}", err)
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.char_index, 6_usize, "{:?}", err);
+        }
+    }
+
+    #[test]
+    fn test_error_leading_comma_object_colno() {
+        let sample = r#"{
+    ,"foo": "bar"
+}"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.colno, 5_usize, "{:?}", err);
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.colno, 5_usize, "{:?}", err);
+        }
+    }
+
+    #[test]
+    fn test_error_unescaped_multi_line_string_lineno() {
+        let sample = r#""foo
+bar"
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.lineno, 1_usize, "{:?}", err);
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.lineno, 1_usize, "{:?}", err);
+        }
+    }
+
+
+    #[test]
+    fn test_error_unescaped_multi_line_string_index() {
+        let sample = r#""foo
+bar"
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.char_index, 4_usize, "{:?}", err)
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.char_index, 4_usize, "{:?}", err);
+        }
+    }
+
+    #[test]
+    fn test_error_unescaped_multi_line_string_colno() {
+        let sample = r#""foo
+bar"
+"#;
+        let maybe_tokens = Tokenizer::new(sample).tokenize();
+        if maybe_tokens.is_err() {
+            let err = maybe_tokens.unwrap_err();
+            assert_eq!(err.colno, 5_usize, "{:?}", err);
+        } else {
+            let toks = maybe_tokens.unwrap();
+            let res = parse(&toks);
+            let err = res.unwrap_err();
+            assert_eq!(err.colno, 5_usize, "{:?}", err);
         }
     }
 
