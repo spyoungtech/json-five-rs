@@ -1,3 +1,4 @@
+use std::error;
 use std::fmt::{Display, Formatter};
 use std::iter::Peekable;
 use std::vec::IntoIter;
@@ -9,25 +10,25 @@ use crate::utils::get_line_col_char;
 
 
 #[derive(PartialEq, Debug)]
-struct JSONKeyValuePair {
-    key: JSONValue,
-    value: JSONValue,
+pub struct JSONKeyValuePair {
+    pub(crate) key: JSONValue,
+    pub(crate) value: JSONValue,
 }
 
 
 #[derive(PartialEq, Debug)]
-enum UnaryOperator {
+pub enum UnaryOperator {
     Plus,
     Minus,
 }
 
 #[derive(PartialEq, Debug)]
-struct Unary {
+pub struct Unary {
     operator: UnaryOperator,
     value: JSONValue,
 }
 #[derive(PartialEq, Debug)]
-enum JSONValue {
+pub enum JSONValue {
     JSONObject { key_value_pairs: Vec<JSONKeyValuePair> },
     JSONArray { values: Vec<JSONValue> },
     Integer(String),
@@ -45,19 +46,20 @@ enum JSONValue {
 }
 
 #[derive(PartialEq, Debug)]
-pub(crate) struct JSONText {
-    value: JSONValue,
+pub struct JSONText {
+    pub(crate) value: JSONValue,
 }
 
 #[derive(Debug, PartialEq)]
-struct ParsingError {
-    index: usize, // byte offset
-    message: String,
-    lineno: usize,
-    colno: usize,
-    char_index: usize, // character offset
-    
+pub struct ParsingError {
+    pub index: usize, // byte offset
+    pub message: String,
+    pub lineno: usize,
+    pub colno: usize,
+    pub char_index: usize, // character offset
 }
+
+
 
 impl Display for ParsingError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -151,7 +153,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
     // }
 
     fn check_and_consume(&mut self, types: Vec<TokType>) -> Option<(&'toks TokenSpan, &'input str)> {
-        let (next_tok, lexeme) = self.peek().unwrap();
+        let (next_tok, _lexeme) = self.peek().unwrap();
         for toktype in types {
             if next_tok.1 == toktype {
                 return self.advance();
@@ -329,10 +331,17 @@ fn parse(tokens: &Tokens) -> Result<JSONText, ParsingError> {
     parser.parse_text()
 }
 
-fn parse_text(source: &str) -> Result<JSONText, ParsingError> {
+pub(crate) fn parse_text(source: &str) -> Result<JSONText, ParsingError> {
     use crate::tokenize::tokenize;
-    let toks = tokenize(source);
-    parse(&toks)
+    let maybe_toks = tokenize(source);
+    match maybe_toks {
+        Err(e) => {
+            return Err(ParsingError{index: e.index, message: e.message, char_index: e.char_index, lineno: e.lineno, colno: e.colno})
+        }
+        Ok(toks) => {
+            parse(&toks)
+        }
+    }
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
-use std::iter::{Peekable, Filter};
-use std::str::{CharIndices, Chars};
+use std::iter::{Peekable};
+use std::str::{CharIndices};
 use crate::utils::get_line_col_char;
 
 #[derive(PartialEq, Clone, Debug)]
@@ -54,8 +54,8 @@ impl<'input> Tokens<'input> {
 
 #[derive(Debug)]
 pub (crate) struct TokenizationError {
-    message: String,
-    index: usize, // byte offset
+    pub(crate) message: String,
+    pub(crate) index: usize, // byte offset
     pub(crate) lineno: usize,
     pub(crate) colno: usize,
     pub(crate) char_index: usize // char offset
@@ -69,7 +69,7 @@ impl<'input> Display for TokenizationError {
 
 #[derive(Debug)]
 pub(crate) struct Tokenizer<'input> {
-    include_whitespace: bool,
+    configuration: TokenizerConfig,
     text: &'input str,
     chars: Peekable<CharIndices<'input>>,
     lookahead: Option<(usize, char)>,
@@ -79,21 +79,31 @@ pub(crate) struct Tokenizer<'input> {
 const HEX_CHARS: &str = "0123456789abcdefABCDEF";
 const IDENTIFIER_SYMBOLS: &str = "$_";
 
-impl <'input> Tokenizer<'input> {
-    pub(crate) fn new(text: &'input str) -> Self {
-        Tokenizer {include_whitespace: false, text: text, chars: text.char_indices().peekable(), lookahead: None}
+#[derive(Debug)]
+struct TokenizerConfig {
+    pub include_whitespace: bool,
+    pub include_comments: bool,
+    pub allow_octal: bool,
+}
+
+impl TokenizerConfig {
+    pub fn new() -> Self {
+        TokenizerConfig {include_whitespace: true, include_comments: true, allow_octal: false}
     }
-    fn with_whitespace(text: &'input str) -> Self {
-        Tokenizer {include_whitespace: true, text: text, chars: text.char_indices().peekable(), lookahead: None}
+}
+
+impl <'input> Tokenizer<'input> {
+    pub fn new(text: &'input str) -> Self {
+        Tokenizer {configuration: TokenizerConfig::new(), text: text, chars: text.char_indices().peekable(), lookahead: None}
+    }
+
+    pub fn with_configuration(text: &'input str, configuration: TokenizerConfig) -> Self {
+        Tokenizer {configuration: configuration, text: text, chars: text.char_indices().peekable(), lookahead: None}
     }
 
     fn advance(&mut self) -> Option<(usize, char)> {
         self.lookahead = self.chars.next();
         self.lookahead
-    }
-
-    fn at_end(&mut self) -> bool {
-        self.chars.peek().is_none()
     }
 
     fn make_error(&self, message: String, start_index: usize) -> TokenizationError {
@@ -121,7 +131,6 @@ impl <'input> Tokenizer<'input> {
                     match char {
                         '\n' | '\r' | '\u{2028}' | '\u{2029}' => {
                             if last_char != '\\' {
-                                let (lineno, colno, char_index) = get_line_col_char(self.text, start_idx);
                                 break Err(self.make_error("Unexpected line terminator without continuation in string literal at".to_string(), idx))
                             }
                             last_char = char;
@@ -161,7 +170,11 @@ impl <'input> Tokenizer<'input> {
 
     fn process_octal(&mut self) -> Result<TokenSpan, TokenizationError> {
         let (start_idx, start_char) = self.lookahead.expect("Unexpected end of input, was processing octal");
-        Err(self.make_error("Octals are forbidden".to_string(), start_idx))
+        if self.configuration.allow_octal {
+            todo!()
+        } else {
+            Err(self.make_error("Octal literals are forbidden".to_string(), start_idx))
+        }
     }
 
     fn process_hexadecimal(&mut self) -> Result<TokenSpan, TokenizationError> {
@@ -203,7 +216,7 @@ impl <'input> Tokenizer<'input> {
         let maybe_second_char = self.chars.peek();
         match maybe_second_char {
             None => return Ok((start_idx, TokType::Integer, start_idx + 1)),
-            Some((second_idx, second_char)) if start_char == '0' => {
+            Some((_second_idx, second_char)) if start_char == '0' => {
                 match second_char {
                     'x' | 'X' => {return self.process_hexadecimal()}
                     sc if sc.is_ascii_digit() => {
@@ -326,7 +339,7 @@ impl <'input> Tokenizer<'input> {
     }
 
     fn process_identifier_or_const(&mut self) -> Result<TokenSpan, TokenizationError> {
-        let (start_idx, start_char) = self.lookahead.expect("Unexpected end of input, was expecting identifier/const char");
+        let (start_idx, _start_char) = self.lookahead.expect("Unexpected end of input, was expecting identifier/const char");
         let mut last_idx = start_idx;
 
         // TODO: ensure that the first character is a valid identifier start character
@@ -354,7 +367,7 @@ impl <'input> Tokenizer<'input> {
     }
 
     fn process_comment(&mut self) -> Result<TokenSpan, TokenizationError> {
-        let (start_idx, char) = self.lookahead.expect("Expected comment start");
+        let (start_idx, _char) = self.lookahead.expect("Expected comment start");
         let (mut last_idx, star_or_slash) = self.advance().expect("Expected second comment char");
         match star_or_slash {
             '/' => {
@@ -394,7 +407,7 @@ impl <'input> Tokenizer<'input> {
                                         None => {
                                             return Err(self.make_error("Unexpected end of input while processing block comment".to_string(), start_idx))
                                         },
-                                        Some((next_peeked_idx, next_peeked_char)) => {
+                                        Some((_next_peeked_idx, next_peeked_char)) => {
                                             match next_peeked_char {
                                                 '/' => {
                                                     (last_idx, _) = self.advance().unwrap();
@@ -446,7 +459,7 @@ impl <'input> Tokenizer<'input> {
                     c if c.is_ascii_digit() => self.process_number(),
                     c if c.is_whitespace() => {
                         let whitespace_tok = self.process_whitespace()?;
-                        if self.include_whitespace {
+                        if self.configuration.include_whitespace {
                             Ok(whitespace_tok)
                         } else {
                             self.next_token()
@@ -482,8 +495,8 @@ impl <'input> Tokenizer<'input> {
     }
 }
 
-pub fn tokenize(text: &'_ str) -> Tokens<'_> {
-    Tokenizer::new(text).tokenize().unwrap()
+pub fn tokenize(text: &'_ str) -> Result<Tokens<'_>, TokenizationError> {
+    Tokenizer::new(text).tokenize()
 }
 
 #[cfg(test)]
@@ -493,7 +506,7 @@ mod test {
     #[test]
     fn test_foo() {
         let text = "";
-        let toks = tokenize(text);
+        let toks = tokenize(text).unwrap();
         let expected = Tokens{ tok_spans: vec![(0, EOF, 0)], source: text};
         assert_eq!(toks, expected);
     }
@@ -501,7 +514,7 @@ mod test {
     #[test]
     fn test_heck() {
         let text = "{}";
-        let toks = tokenize(text);
+        let toks = tokenize(text).unwrap();
         let expected = Tokens{ tok_spans: vec![(0, LeftBrace, 1), (1, RightBrace, 2), (2, EOF, 2)], source: text};
         assert_eq!(toks, expected);
     }
@@ -509,7 +522,7 @@ mod test {
     #[test]
     fn test_heck2() {
         let text = "{\"foo\":\"bar\"}";
-        let toks = tokenize(text);
+        let toks = tokenize(text).unwrap();
         let expected = Tokens{ tok_spans: vec![(0, LeftBrace, 1), (1, DoubleQuotedString, 6), (6, Colon, 7), (7, DoubleQuotedString, 12), (12, RightBrace, 13), (13, EOF, 13)], source: text};
         assert_eq!(toks, expected)
     }
@@ -517,7 +530,7 @@ mod test {
     #[test]
     fn test_single_quoted_string() {
         let text = "{'foo':'bar'}";
-        let toks = tokenize(text);
+        let toks = tokenize(text).unwrap();
         let expected = Tokens{ tok_spans: vec![(0, LeftBrace, 1), (1, SingleQuotedString, 6), (6, Colon, 7), (7, SingleQuotedString, 12), (12, RightBrace, 13), (13, EOF, 13)], source: text};
         assert_eq!(toks, expected);
     }
@@ -525,7 +538,7 @@ mod test {
     #[test]
     fn test_array() {
         let text = "[1,2,3]";
-        let toks = tokenize(text);
+        let toks = tokenize(text).unwrap();
         let expected = Tokens{ tok_spans: vec![(0, LeftBracket, 1), (1, Integer, 2), (2, Comma, 3), (3, Integer, 4), (4, Comma, 5), (5, Integer, 6), (6, RightBracket, 7), (7, EOF, 7)], source: text};
         assert_eq!(toks, expected);
     }
@@ -533,7 +546,7 @@ mod test {
     #[test]
     fn test_float_number() {
         let text = "[1.23,4.56]";
-        let toks = tokenize(text);
+        let toks = tokenize(text).unwrap();
         let expected = Tokens{ tok_spans: vec![(0, LeftBracket, 1), (1, Float, 5), (5, Comma, 6), (6, Float, 10), (10, RightBracket, 11), (11, EOF, 11)], source: text};
         assert_eq!(toks, expected);
     }
@@ -541,7 +554,7 @@ mod test {
     #[test]
     fn test_exponent_number() {
         let text = "[1e10,2e-5]";
-        let toks = tokenize(text);
+        let toks = tokenize(text).unwrap();
         let expected = Tokens{ tok_spans: vec![(0, LeftBracket, 1), (1, Exponent, 5), (5, Comma, 6), (6, Exponent, 10), (10, RightBracket, 11), (11, EOF, 11)], source: text};
         assert_eq!(toks, expected);
     }
@@ -549,7 +562,7 @@ mod test {
     #[test]
     fn test_whitespace() {
         let text = " {\n\t} ";
-        let toks = tokenize(text);
+        let toks = tokenize(text).unwrap();
         let expected = Tokens{ tok_spans: vec![(1, LeftBrace, 2), (4, RightBrace, 5), (6, EOF, 6)], source: text};
         assert_eq!(toks, expected);
     }
@@ -557,7 +570,7 @@ mod test {
     #[test]
     fn test_true_false_null() {
         let text = "[true,false,null]";
-        let toks = tokenize(text);
+        let toks = tokenize(text).unwrap();
         let expected = Tokens{source: text, tok_spans: vec![(0, LeftBracket, 1), (1, True, 5), (5, Comma, 6), (6, False, 11), (11, Comma, 12), (12, Null, 16), (16, RightBracket, 17), (17, EOF, 17)]};
         assert_eq!(toks, expected);
         }
@@ -565,7 +578,7 @@ mod test {
     #[test]
     fn test_number() {
         let text = "123";
-        let toks = tokenize(text);
+        let toks = tokenize(text).unwrap();
         let expected = Tokens{source: text, tok_spans: vec![(0, Integer, 3), (3, EOF, 3)]};
         assert_eq!(toks, expected);
 
