@@ -7,7 +7,7 @@ use serde::ser::{
     SerializeStructVariant, SerializeTupleVariant, SerializeTupleStruct
 };
 use std::fmt;
-
+use crate::parser::JSONValue::DoubleQuotedString;
 
 /// Convert any `T: Serialize` into your `JSONValue`.
 pub fn to_json_model<T>(value: &T) -> Result<JSONValue, SerdeJSON5Error>
@@ -480,6 +480,7 @@ impl Serializer for JSONValueSerializer {
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
     use super::*;
     use serde::Serialize;
     #[derive(Debug, Serialize)]
@@ -510,6 +511,20 @@ mod test {
                 println!("Serialized to JSONValue: {:?}", json_value);
                 // If you want a JSONText:
                 // let text = JSONText { value: json_value };
+            }
+            Err(e) => eprintln!("Error: {:?}", e),
+        }
+    }
+
+    #[test]
+    fn test_hashmap() {
+        use crate::parser::{JSONValue, JSONKeyValuePair, JSONText};
+        let mut example: HashMap<String, String> = HashMap::new();
+        example.insert("foo".to_string(), "bar".to_string());
+        match to_json_model(&example) {
+            Ok(val) => {
+                let expected = JSONValue::JSONObject { key_value_pairs: vec![JSONKeyValuePair { key: JSONValue::DoubleQuotedString("foo".to_string()), value: JSONValue::DoubleQuotedString("bar".to_string()) }] };
+                assert_eq!(val, expected)
             }
             Err(e) => eprintln!("Error: {:?}", e),
         }
