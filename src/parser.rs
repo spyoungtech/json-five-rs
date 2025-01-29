@@ -22,11 +22,7 @@ pub enum UnaryOperator {
     Minus,
 }
 
-#[derive(PartialEq, Debug)]
-pub struct Unary {
-    operator: UnaryOperator,
-    value: JSONValue,
-}
+
 #[derive(PartialEq, Debug)]
 pub enum JSONValue {
     JSONObject { key_value_pairs: Vec<JSONKeyValuePair> },
@@ -49,6 +45,140 @@ pub enum JSONValue {
 pub struct JSONText {
     pub(crate) value: JSONValue,
 }
+
+enum TrailingComma {
+    ALL,
+    OBJECTS,
+    ARRAYS,
+    NONE
+}
+
+struct StyleConfiguration {
+    indent: Option<usize>,
+    item_separator: String,
+    key_separator: String,
+    current_indent: usize,
+    trailing_comma: TrailingComma
+}
+
+impl StyleConfiguration {
+    pub fn new(indent: Option<usize>, item_separator: &str, key_separator: &str, trailing_comma: TrailingComma) -> Self {
+        StyleConfiguration{indent: None, item_separator: item_separator.to_string(), key_separator: key_separator.to_string(), current_indent: 0, trailing_comma: trailing_comma}
+    }
+
+    pub fn with_indent(indent: usize, trailing_comma: TrailingComma) -> Self {
+        todo!()
+    }
+
+    pub fn with_separators(item_separator: &str, key_separator: &str, trailing_comma: TrailingComma) -> Self {
+        todo!()
+    }
+
+    pub fn default() -> Self {
+        StyleConfiguration{indent: None, item_separator: ", ".to_string(), key_separator: ": ".to_string(), current_indent: 0, trailing_comma: TrailingComma::NONE}
+
+    }
+}
+
+impl JSONKeyValuePair {
+    fn to_string_styled(&self, style: &mut StyleConfiguration) -> String {
+        format!("{}{}{}", self.key.to_string_styled(style), style.item_separator, self.value)
+    }
+}
+
+impl JSONValue {
+    fn to_string_styled(&self, style: &mut StyleConfiguration) -> String {
+        match self {
+            JSONValue::Identifier(s) | JSONValue::Integer(s) | JSONValue::Float(s) | JSONValue::Exponent(s) | JSONValue::Hexadecimal(s) => {
+                format!("{}", s)
+            }
+            JSONValue::Bool(b) => {
+                format!("{}", b)
+            }
+            JSONValue::DoubleQuotedString(s) => {
+                format!("\"{}\"", s)
+            }
+            JSONValue::SingleQuotedString(s) => {
+                format!("'{}'", s)
+            }
+
+            JSONValue::Null => {format!("null")}
+            JSONValue::Infinity => {format!("Infinity")}
+            JSONValue::NaN => {format!("NaN")}
+
+            JSONValue::Unary { operator, value } => {
+                let op_char = match operator {
+                    UnaryOperator::Plus => {'+'}
+                    UnaryOperator::Minus => {'-'}
+                };
+                let value_string = value.to_string();
+                format!("{}{}", op_char, value_string)
+            }
+            JSONValue::JSONObject { key_value_pairs} => {
+                let mut ret: String;
+
+                match style.indent {
+                    None => {
+                        ret = String::from("{");
+                    }
+                    Some(ident) => {
+                        style.current_indent += ident;
+                        ret = format!("{{\n{}", style.current_indent);
+                    }
+                }
+                for (idx, kvp) in key_value_pairs.iter().enumerate() {
+                    ret.push_str(kvp.to_string_styled(style).as_str());
+                    if idx < key_value_pairs.len() - 1 {
+                        match style.indent {
+                            None => {
+                                ret.push_str(style.item_separator.as_str());
+                            }
+                            Some(ident) => {
+                                ret.push_str(format!(",\n{}", style.current_indent).as_str())
+                            }
+                        }
+                    }
+                }
+                match style.trailing_comma {
+                    TrailingComma::ALL | TrailingComma::OBJECTS => {
+                        ret.push(',')
+                    }
+                    _ => {}
+                }
+                match style.indent {
+                    None => {
+                        todo!()
+                    }
+                    Some(ident) => {
+                        todo!()
+                    }
+                }
+            }
+            JSONValue::JSONArray { .. } => {
+                todo!()
+            }
+
+        }
+    }
+}
+
+
+impl Display for JSONValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut style = StyleConfiguration::default();
+        let res = self.to_string_styled(&mut style);
+        write!(f, "{}", res)
+    }
+}
+
+
+impl Display for JSONText {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value.to_string())
+    }
+}
+
+
 
 #[derive(Debug, PartialEq)]
 pub struct ParsingError {
@@ -332,8 +462,8 @@ pub fn from_tokens(tokens: &Tokens) -> Result<JSONText, ParsingError> {
 }
 
 pub fn from_str(source: &str) -> Result<JSONText, ParsingError> {
-    use crate::tokenize::tokenize;
-    let maybe_toks = tokenize(source);
+    use crate::tokenize::tokenize_str;
+    let maybe_toks = tokenize_str(source);
     match maybe_toks {
         Err(e) => {
             Err(ParsingError{index: e.index, message: e.message, char_index: e.char_index, lineno: e.lineno, colno: e.colno})

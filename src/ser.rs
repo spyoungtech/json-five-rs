@@ -1,4 +1,4 @@
-use crate::parser::{JSONValue, JSONText, JSONKeyValuePair, Unary, UnaryOperator};
+use crate::parser::{JSONValue, JSONText, JSONKeyValuePair, UnaryOperator};
 
 
 
@@ -9,15 +9,29 @@ use serde::ser::{
 use std::fmt;
 use crate::parser::JSONValue::DoubleQuotedString;
 
-/// Convert any `T: Serialize` into your `JSONValue`.
-pub fn to_json_model<T>(value: &T) -> Result<JSONValue, SerdeJSON5Error>
+pub fn to_json_model<T>(value: &T) -> Result<JSONText, SerdeJSON5Error>
 where
     T: Serialize,
 {
     let serializer = JSONValueSerializer;
-    value.serialize(serializer)
+    let val = value.serialize(serializer)?;
+    Ok(JSONText{ value: val})
 }
 
+pub fn to_string<T>(value: &T) -> Result<String, SerdeJSON5Error>
+where
+    T: Serialize
+{
+    let serializer = JSONValueSerializer;
+    let maybe_model = value.serialize(serializer);
+    match maybe_model {
+        Err(e) => {Err(SerdeJSON5Error::Custom(e.to_string()))}
+        Ok(model) => {
+            Ok(model.to_string())
+        }
+    }
+
+}
 
 #[derive(Debug)]
 pub enum SerdeJSON5Error {
