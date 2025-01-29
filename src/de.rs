@@ -1,6 +1,6 @@
 use serde::de::{self, DeserializeSeed, Deserialize, Deserializer, Error as DeError, MapAccess, SeqAccess, VariantAccess, Visitor};
 use std::fmt;
-use crate::parser::{JSONText, JSONValue, JSONKeyValuePair, Unary, UnaryOperator, ParsingError, parse_text};
+use crate::parser::{JSONText, JSONValue, JSONKeyValuePair, Unary, UnaryOperator, ParsingError, from_str as model_from_str};
 #[derive(Debug)]
 pub enum SerdeJSON5Error {
     Custom(String),
@@ -531,7 +531,7 @@ where
     T: Deserialize<'de>,
 {
     // 1) Parse the string into your JSONText
-    let parsed = parse_text(s).map_err(|err| SerdeJSON5Error::Custom(err.to_string()))?;
+    let parsed = model_from_str(s).map_err(|err| SerdeJSON5Error::Custom(err.to_string()))?;
 
     // 2) Wrap the JSONValue in our deserializer
     let deserializer = JSONValueDeserializer {
@@ -544,6 +544,7 @@ where
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
     use serde::Deserialize;
     use super::*;
     #[derive(Debug, Deserialize)]
@@ -571,6 +572,27 @@ mod test {
                 println!("Error: {:?}", e);
             }
         }
+    }
+
+    #[test]
+    fn test_hashmap() {
+        let source = r#"
+        // A possible JSON5 input
+        {
+          name: 'Hello',
+          count: '42',
+          maybe: null
+        }
+    "#;
+
+        let res: HashMap<String, Option<String>> = from_str(source).unwrap();
+        let expected = HashMap::from([
+            (String::from("name"), Some(String::from("Hello"))),
+            (String::from("count"), Some(String::from("42"))),
+            (String::from("maybe"), None),
+        ]);
+        assert_eq!(res, expected)
+
     }
 
 }

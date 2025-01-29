@@ -326,20 +326,20 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
     }
 }
 
-fn parse(tokens: &Tokens) -> Result<JSONText, ParsingError> {
+pub fn from_tokens(tokens: &Tokens) -> Result<JSONText, ParsingError> {
     let mut parser = JSON5Parser::new(tokens);
     parser.parse_text()
 }
 
-pub(crate) fn parse_text(source: &str) -> Result<JSONText, ParsingError> {
+pub fn from_str(source: &str) -> Result<JSONText, ParsingError> {
     use crate::tokenize::tokenize;
     let maybe_toks = tokenize(source);
     match maybe_toks {
         Err(e) => {
-            return Err(ParsingError{index: e.index, message: e.message, char_index: e.char_index, lineno: e.lineno, colno: e.colno})
+            Err(ParsingError{index: e.index, message: e.message, char_index: e.char_index, lineno: e.lineno, colno: e.colno})
         }
         Ok(toks) => {
-            parse(&toks)
+            from_tokens(&toks)
         }
     }
 }
@@ -351,77 +351,77 @@ mod tests {
     use super::*;
     #[test]
     fn test_foo() {
-        let res = parse_text("{}").unwrap();
+        let res = from_str("{}").unwrap();
         let expected = JSONText{value: JSONValue::JSONObject {key_value_pairs: vec![]}};
         assert_eq!(res, expected)
     }
 
     #[test]
     fn test_object() {
-        let res = parse_text("{\"foo\": \"bar\"}").unwrap();
+        let res = from_str("{\"foo\": \"bar\"}").unwrap();
         let expected = JSONText{value: JSONValue::JSONObject {key_value_pairs: vec![JSONKeyValuePair{key: JSONValue::DoubleQuotedString("foo".to_string()), value: JSONValue::DoubleQuotedString("bar".to_string())}]}};
         assert_eq!(res, expected)
     }
 
     #[test]
     fn test_identifier(){
-        let res = parse_text("{foo: \"bar\"}").unwrap();
+        let res = from_str("{foo: \"bar\"}").unwrap();
         let expected = JSONText{value: JSONValue::JSONObject {key_value_pairs: vec![JSONKeyValuePair{key: JSONValue::Identifier("foo".to_string()), value: JSONValue::DoubleQuotedString("bar".to_string())}]}};
         assert_eq!(res, expected)
     }
 
     #[test]
     fn test_array() {
-        let res = parse_text("[1,2,3]").unwrap();
+        let res = from_str("[1,2,3]").unwrap();
         let expected = JSONText{value: JSONArray {values: vec![JSONValue::Integer("1".to_string()), JSONValue::Integer("2".to_string()), JSONValue::Integer("3".to_string())]}};
         assert_eq!(res, expected)
     }
 
     #[test]
     fn val_int() {
-        let res = parse_text("1").unwrap();
+        let res = from_str("1").unwrap();
         let expected = JSONText{value: Integer("1".to_string())};
         assert_eq!(res, expected)
     }
 
     #[test]
     fn val_float() {
-        let res = parse_text("1.0").unwrap();
+        let res = from_str("1.0").unwrap();
         let expected = JSONText{value: Float("1.0".to_string())};
         assert_eq!(res, expected)
     }
 
     #[test]
     fn val_string() {
-        let res = parse_text("'foo'").unwrap();
+        let res = from_str("'foo'").unwrap();
         let expected = JSONText{value: SingleQuotedString("foo".to_string())};
         assert_eq!(res, expected)
     }
 
     #[test]
     fn multiline_string() {
-        let res = parse_text("'foo\\\nbar'").unwrap();
+        let res = from_str("'foo\\\nbar'").unwrap();
         let expected = JSONText{value: SingleQuotedString("foo\\\nbar".to_string())};
         assert_eq!(res, expected)
     }
 
     #[test]
     fn test_empty_string() {
-        let res = parse_text("\"\"").unwrap();
+        let res = from_str("\"\"").unwrap();
         let expected = JSONText { value: DoubleQuotedString("".to_string()) };
         assert_eq!(res, expected);
     }
 
     #[test]
     fn test_single_element_array() {
-        let res = parse_text("[42]").unwrap();
+        let res = from_str("[42]").unwrap();
         let expected = JSONText { value: JSONArray { values: vec![Integer("42".to_string())] } };
         assert_eq!(res, expected);
     }
 
     #[test]
     fn test_single_key_object() {
-        let res = parse_text("{\"key\": \"value\"}").unwrap();
+        let res = from_str("{\"key\": \"value\"}").unwrap();
         let expected = JSONText {
             value: JSONObject {
                 key_value_pairs: vec![
@@ -437,7 +437,7 @@ mod tests {
 
     #[test]
     fn test_trailing_comma_in_array() {
-        let res = parse_text("[1, 2, 3,]").unwrap();
+        let res = from_str("[1, 2, 3,]").unwrap();
         let expected = JSONText {
             value: JSONArray {
                 values: vec![Integer("1".to_string()), Integer("2".to_string()), Integer("3".to_string())]
@@ -448,7 +448,7 @@ mod tests {
 
     #[test]
     fn test_trailing_comma_in_object() {
-        let res = parse_text("{\"a\": 1, \"b\": 2,}").unwrap();
+        let res = from_str("{\"a\": 1, \"b\": 2,}").unwrap();
         let expected = JSONText {
             value: JSONObject {
                 key_value_pairs: vec![
@@ -468,7 +468,7 @@ mod tests {
 
     #[test]
     fn test_unquoted_key() {
-        let res = parse_text("{key: \"value\"}").unwrap();
+        let res = from_str("{key: \"value\"}").unwrap();
         let expected = JSONText {
             value: JSONObject {
                 key_value_pairs: vec![
@@ -484,20 +484,20 @@ mod tests {
 
     #[test]
     fn test_multiline_string() {
-        let res = parse_text("\"multi\\\nline\"").unwrap();
+        let res = from_str("\"multi\\\nline\"").unwrap();
         let expected = JSONText { value: DoubleQuotedString("multi\\\nline".to_string()) };
         assert_eq!(res, expected);
     }
 
     #[test]
     fn test_unicode_characters() {
-        let res = parse_text("\"\\u2764\"").unwrap();
+        let res = from_str("\"\\u2764\"").unwrap();
         let expected = JSONText { value: DoubleQuotedString("\\u2764".to_string()) };
         assert_eq!(res, expected);
     }
     #[test]
     fn test_trailing_comma_in_nested_array() {
-        let res = parse_text("[[1, 2,],]").unwrap();
+        let res = from_str("[[1, 2,],]").unwrap();
         let expected = JSONText {
             value: JSONArray {
                 values: vec![
@@ -514,7 +514,7 @@ mod tests {
     #[test]
     fn test_empty_array() {
         let sample = r#"[]"#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
         let expected = JSONText{ value: JSONArray {values: vec![]}};
         assert_eq!(res, expected)
     }
@@ -531,7 +531,7 @@ mod tests {
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -547,7 +547,7 @@ mod tests {
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -564,7 +564,7 @@ mod tests {
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -577,7 +577,7 @@ mod tests {
     false,
     null
 ]"#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -587,7 +587,7 @@ mod tests {
         let sample = r#"[
     null,
 ]"#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -600,7 +600,7 @@ mod tests {
         true
     */
 ]"#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -612,7 +612,7 @@ mod tests {
     Some non-comment top-level value is needed;
     we use null above.
 */"#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -620,7 +620,7 @@ mod tests {
     #[test]
     fn test_block_comment_in_string() {
         let sample = r#""This /* block comment */ isn't really a block comment.""#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -632,7 +632,7 @@ mod tests {
     we use null below.
 */
 null"#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -646,7 +646,7 @@ null"#;
  * Like this:
  **/
 true"#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -656,7 +656,7 @@ true"#;
         let sample = r#"[
     false   // true
 ]"#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -664,7 +664,7 @@ true"#;
     #[test]
     fn test_inline_comment_following_top_level_value() {
         let sample = r#"null // Some non-comment top-level value is needed; we use null here."#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -672,7 +672,7 @@ true"#;
     #[test]
     fn test_inline_comment_in_string() {
         let sample = r#""This inline comment // isn't really an inline comment.""#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -681,7 +681,7 @@ true"#;
     fn test_inline_comment_preceding_top_level_value() {
         let sample = r#"// Some non-comment top-level value is needed; we use null below.
 null"#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -697,7 +697,7 @@ null"#;
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -711,7 +711,7 @@ null"#;
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -730,7 +730,7 @@ null"#;
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -744,7 +744,7 @@ null"#;
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -859,7 +859,7 @@ null"#;
   ]
 }
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -973,7 +973,7 @@ null"#;
   ],
 }
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1006,7 +1006,7 @@ multi-line string',
     ],
 }
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1019,7 +1019,7 @@ multi-line string',
   "a": true
 }
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1030,7 +1030,7 @@ multi-line string',
     // This comment is terminated with `\r`.
 }
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1041,7 +1041,7 @@ multi-line string',
     // This comment is terminated with `\r\n`.
 }
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1052,7 +1052,7 @@ multi-line string',
     // This comment is terminated with `\n`.
 }
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1065,7 +1065,7 @@ multi-line string',
 line 2'
 }
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1078,7 +1078,7 @@ line 2'
 line 2'
 }
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1091,7 +1091,7 @@ line 2'
 line 2'
 }
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1100,7 +1100,7 @@ line 2'
     fn test_float_leading_decimal_point() {
         let sample = r#".5
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1109,7 +1109,7 @@ line 2'
     fn test_float_leading_zero() {
         let sample = r#"0.5
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1118,7 +1118,7 @@ line 2'
     fn test_float_trailing_decimal_point_with_integer_exponent() {
         let sample = r#"5.e4
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1127,7 +1127,7 @@ line 2'
     fn test_float_trailing_decimal_point() {
         let sample = r#"5.
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1136,7 +1136,7 @@ line 2'
     fn test_float_with_integer_exponent() {
         let sample = r#"1.2e3
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1145,7 +1145,7 @@ line 2'
     fn test_float() {
         let sample = r#"1.2
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1159,7 +1159,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1169,7 +1169,7 @@ line 2'
     fn test_hexadecimal_lowercase_letter() {
         let sample = r#"0xc8
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1178,7 +1178,7 @@ line 2'
     fn test_hexadecimal_uppercase_x() {
         let sample = r#"0XC8
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1187,7 +1187,7 @@ line 2'
     fn test_hexadecimal_with_integer_exponent() {
         let sample = r#"0xc8e4
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1196,7 +1196,7 @@ line 2'
     fn test_hexadecimal() {
         let sample = r#"0xC8
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1205,7 +1205,7 @@ line 2'
     fn test_infinity() {
         let sample = r#"Infinity
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1219,7 +1219,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err(), "{:?}", res.unwrap());
         }
     }
@@ -1234,7 +1234,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1244,7 +1244,7 @@ line 2'
     fn test_integer_with_integer_exponent() {
         let sample = r#"2e23
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1258,7 +1258,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1273,7 +1273,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err(), "{:?}", res.unwrap());
         }
     }
@@ -1283,7 +1283,7 @@ line 2'
     fn test_integer_with_negative_integer_exponent() {
         let sample = r#"2e-23
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1292,7 +1292,7 @@ line 2'
     fn test_integer_with_negative_zero_integer_exponent() {
         let sample = r#"5e-0
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1306,7 +1306,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1321,7 +1321,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1331,7 +1331,7 @@ line 2'
     fn test_integer_with_positive_integer_exponent() {
         let sample = r#"1e+2
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1340,7 +1340,7 @@ line 2'
     fn test_integer_with_positive_zero_integer_exponent() {
         let sample = r#"5e+0
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1349,7 +1349,7 @@ line 2'
     fn test_integer_with_zero_integer_exponent() {
         let sample = r#"5e0
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1358,7 +1358,7 @@ line 2'
     fn test_integer() {
         let sample = r#"15
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1372,7 +1372,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err(), "{:?}", res.unwrap());
         }
     }
@@ -1382,7 +1382,7 @@ line 2'
     fn test_nan() {
         let sample = r#"NaN
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1391,7 +1391,7 @@ line 2'
     fn test_negative_float_leading_decimal_point() {
         let sample = r#"-.5
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1400,7 +1400,7 @@ line 2'
     fn test_negative_float_leading_zero() {
         let sample = r#"-0.5
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1409,7 +1409,7 @@ line 2'
     fn test_negative_float_trailing_decimal_point() {
         let sample = r#"-5.
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1418,7 +1418,7 @@ line 2'
     fn test_negative_float() {
         let sample = r#"-1.2
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1427,7 +1427,7 @@ line 2'
     fn test_negative_hexadecimal() {
         let sample = r#"-0xC8
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1436,7 +1436,7 @@ line 2'
     fn test_negative_infinity() {
         let sample = r#"-Infinity
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1445,7 +1445,7 @@ line 2'
     fn test_negative_integer() {
         let sample = r#"-15
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1459,7 +1459,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1474,7 +1474,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1484,7 +1484,7 @@ line 2'
     fn test_negative_zero_float_leading_decimal_point() {
         let sample = r#"-.0
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1493,7 +1493,7 @@ line 2'
     fn test_negative_zero_float_trailing_decimal_point() {
         let sample = r#"-0.
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1502,7 +1502,7 @@ line 2'
     fn test_negative_zero_float() {
         let sample = r#"-0.0
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1511,7 +1511,7 @@ line 2'
     fn test_negative_zero_hexadecimal() {
         let sample = r#"-0x0
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1520,7 +1520,7 @@ line 2'
     fn test_negative_zero_integer() {
         let sample = r#"-0
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1534,7 +1534,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1549,7 +1549,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1564,7 +1564,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1579,7 +1579,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1589,7 +1589,7 @@ line 2'
     fn test_positive_float_leading_decimal_point() {
         let sample = r#"+.5
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1598,7 +1598,7 @@ line 2'
     fn test_positive_float_leading_zero() {
         let sample = r#"+0.5
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1607,7 +1607,7 @@ line 2'
     fn test_positive_float_trailing_decimal_point() {
         let sample = r#"+5.
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1616,7 +1616,7 @@ line 2'
     fn test_positive_float() {
         let sample = r#"+1.2
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1625,7 +1625,7 @@ line 2'
     fn test_positive_hexadecimal() {
         let sample = r#"+0xC8
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1634,7 +1634,7 @@ line 2'
     fn test_positive_infinity() {
         let sample = r#"+Infinity
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1643,7 +1643,7 @@ line 2'
     fn test_positive_integer() {
         let sample = r#"+15
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1657,7 +1657,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1672,7 +1672,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1682,7 +1682,7 @@ line 2'
     fn test_positive_zero_float_leading_decimal_point() {
         let sample = r#"+.0
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1691,7 +1691,7 @@ line 2'
     fn test_positive_zero_float_trailing_decimal_point() {
         let sample = r#"+0.
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1700,7 +1700,7 @@ line 2'
     fn test_positive_zero_float() {
         let sample = r#"+0.0
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1709,7 +1709,7 @@ line 2'
     fn test_positive_zero_hexadecimal() {
         let sample = r#"+0x0
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1718,7 +1718,7 @@ line 2'
     fn test_positive_zero_integer() {
         let sample = r#"+0
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1732,7 +1732,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1742,7 +1742,7 @@ line 2'
     fn test_zero_float_leading_decimal_point() {
         let sample = r#".0
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1751,7 +1751,7 @@ line 2'
     fn test_zero_float_trailing_decimal_point() {
         let sample = r#"0.
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1760,7 +1760,7 @@ line 2'
     fn test_zero_float() {
         let sample = r#"0.0
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1769,7 +1769,7 @@ line 2'
     fn test_zero_hexadecimal() {
         let sample = r#"0x0
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1778,7 +1778,7 @@ line 2'
     fn test_zero_integer_with_integer_exponent() {
         let sample = r#"0e23
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1787,7 +1787,7 @@ line 2'
     fn test_zero_integer() {
         let sample = r#"0
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1801,7 +1801,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1814,7 +1814,7 @@ line 2'
     "a": false
 }
 "#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1822,7 +1822,7 @@ line 2'
     #[test]
     fn test_empty_object() {
         let sample = r#"{}"#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1837,7 +1837,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1853,7 +1853,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1869,7 +1869,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1885,7 +1885,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1902,7 +1902,7 @@ line 2'
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -1913,7 +1913,7 @@ line 2'
         let sample = r#"{
     while: true
 }"#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1923,7 +1923,7 @@ line 2'
         let sample = r#"{
     'hello': "world"
 }"#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1933,7 +1933,7 @@ line 2'
         let sample = r#"{
     "foo": "bar",
 }"#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1948,7 +1948,7 @@ line 2'
     _$_: "multiple symbols",
     $_$hello123world_$_: "mixed"
 }"#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1956,7 +1956,7 @@ line 2'
     #[test]
     fn test_escaped_single_quoted_string() {
         let sample = r#"'I can\'t wait'"#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1965,7 +1965,7 @@ line 2'
     fn test_multi_line_string() {
         let sample = r#"'hello\
  world'"#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1973,7 +1973,7 @@ line 2'
     #[test]
     fn test_single_quoted_string() {
         let sample = r#"'hello world'"#;
-        let res = parse_text(sample).unwrap();
+        let res = from_str(sample).unwrap();
     }
 
 
@@ -1988,7 +1988,7 @@ bar"
             return
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             assert!(res.is_err());
         }
     }
@@ -2008,7 +2008,7 @@ bar"
             assert_eq!(err.lineno, 3_usize, "{:?}", err);
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.lineno, 3_usize, "{:?}", err);
         }
@@ -2027,7 +2027,7 @@ bar"
             assert_eq!(err.char_index, 15_usize, "{:?}", err)
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.char_index, 15_usize, "{:?}", err);
         }
@@ -2045,7 +2045,7 @@ bar"
             assert_eq!(err.colno, 5_usize, "{:?}", err);
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.colno, 5_usize, "{:?}", err);
         }
@@ -2064,7 +2064,7 @@ bar"
             assert_eq!(err.lineno, 4_usize, "{:?}", err);
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.lineno, 4_usize, "{:?}", err);
         }
@@ -2084,7 +2084,7 @@ bar"
             assert_eq!(err.char_index, 76_usize, "{:?}", err)
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.char_index, 76_usize, "{:?}", err);
         }
@@ -2103,7 +2103,7 @@ bar"
             assert_eq!(err.colno, 3_usize, "{:?}", err);
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.colno, 3_usize, "{:?}", err);
         }
@@ -2120,7 +2120,7 @@ bar"
             assert_eq!(err.lineno, 1_usize, "{:?}", err);
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.lineno, 1_usize, "{:?}", err);
         }
@@ -2137,7 +2137,7 @@ bar"
             assert_eq!(err.char_index, 65_usize, "{:?}", err)
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.char_index, 65_usize, "{:?}", err);
         }
@@ -2153,7 +2153,7 @@ bar"
             assert_eq!(err.colno, 66_usize, "{:?}", err);
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.colno, 66_usize, "{:?}", err);
         }
@@ -2170,7 +2170,7 @@ bar"
             assert_eq!(err.lineno, 2_usize, "{:?}", err);
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.lineno, 2_usize, "{:?}", err);
         }
@@ -2189,7 +2189,7 @@ bar"
             assert_eq!(err.char_index, 6_usize, "{:?}", err)
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.char_index, 6_usize, "{:?}", err);
         }
@@ -2207,7 +2207,7 @@ bar"
             assert_eq!(err.colno, 5_usize, "{:?}", err);
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.colno, 5_usize, "{:?}", err);
         }
@@ -2226,7 +2226,7 @@ bar"
             assert_eq!(err.lineno, 2_usize, "{:?}", err);
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.lineno, 2_usize, "{:?}", err);
         }
@@ -2244,7 +2244,7 @@ bar"
             assert_eq!(err.char_index, 11_usize, "{:?}", err)
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.char_index, 11_usize, "{:?}", err);
         }
@@ -2261,7 +2261,7 @@ bar"
             assert_eq!(err.colno, 10_usize, "{:?}", err);
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.colno, 10_usize, "{:?}", err);
         }
@@ -2280,7 +2280,7 @@ bar"
             assert_eq!(err.lineno, 2_usize, "{:?}", err);
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.lineno, 2_usize, "{:?}", err);
         }
@@ -2298,7 +2298,7 @@ bar"
             assert_eq!(err.char_index, 6_usize, "{:?}", err)
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.char_index, 6_usize, "{:?}", err);
         }
@@ -2315,7 +2315,7 @@ bar"
             assert_eq!(err.colno, 5_usize, "{:?}", err);
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.colno, 5_usize, "{:?}", err);
         }
@@ -2332,7 +2332,7 @@ bar"
             assert_eq!(err.lineno, 1_usize, "{:?}", err);
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.lineno, 1_usize, "{:?}", err);
         }
@@ -2350,7 +2350,7 @@ bar"
             assert_eq!(err.char_index, 4_usize, "{:?}", err)
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.char_index, 4_usize, "{:?}", err);
         }
@@ -2367,7 +2367,7 @@ bar"
             assert_eq!(err.colno, 5_usize, "{:?}", err);
         } else {
             let toks = maybe_tokens.unwrap();
-            let res = parse(&toks);
+            let res = from_tokens(&toks);
             let err = res.unwrap_err();
             assert_eq!(err.colno, 5_usize, "{:?}", err);
         }
