@@ -102,9 +102,9 @@ impl JSONValue {
                 format!("'{}'", s)
             }
 
-            JSONValue::Null => {format!("null")}
-            JSONValue::Infinity => {format!("Infinity")}
-            JSONValue::NaN => {format!("NaN")}
+            JSONValue::Null => {"null".to_string()}
+            JSONValue::Infinity => {"Infinity".to_string()}
+            JSONValue::NaN => {"NaN".to_string()}
 
             JSONValue::Unary { operator, value } => {
                 let op_char = match operator {
@@ -141,23 +141,24 @@ impl JSONValue {
                 }
                 match style.trailing_comma {
                     TrailingComma::ALL | TrailingComma::OBJECTS => {
-                        ret.push(',')
+                        ret.push(',');
                     }
                     _ => {}
                 }
                 match style.indent {
                     None => {
-                        todo!()
+                        ret.push_str("}");
                     }
                     Some(ident) => {
-                        todo!()
+                        style.current_indent -= ident;
+                        ret.push_str(format!("\n{}}}", style.current_indent).as_str());
                     }
                 }
+                ret
             }
             JSONValue::JSONArray { .. } => {
                 todo!()
             }
-
         }
     }
 }
