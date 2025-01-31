@@ -1,4 +1,3 @@
-use std::error;
 use std::fmt::{Display, Formatter};
 use std::iter::Peekable;
 use std::vec::IntoIter;
@@ -46,39 +45,9 @@ pub struct JSONText {
     pub(crate) value: JSONValue,
 }
 
-enum TrailingComma {
-    ALL,
-    OBJECTS,
-    ARRAYS,
-    NONE
-}
 
-struct StyleConfiguration {
-    indent: Option<usize>,
-    item_separator: String,
-    key_separator: String,
-    current_indent: usize,
-    trailing_comma: TrailingComma
-}
 
-impl StyleConfiguration {
-    pub fn new(indent: Option<usize>, item_separator: &str, key_separator: &str, trailing_comma: TrailingComma) -> Self {
-        StyleConfiguration{indent: None, item_separator: item_separator.to_string(), key_separator: key_separator.to_string(), current_indent: 0, trailing_comma: trailing_comma}
-    }
-
-    pub fn with_indent(indent: usize, trailing_comma: TrailingComma) -> Self {
-        todo!()
-    }
-
-    pub fn with_separators(item_separator: &str, key_separator: &str, trailing_comma: TrailingComma) -> Self {
-        todo!()
-    }
-
-    pub fn default() -> Self {
-        StyleConfiguration{indent: None, item_separator: ", ".to_string(), key_separator: ": ".to_string(), current_indent: 0, trailing_comma: TrailingComma::NONE}
-
-    }
-}
+use crate::parser::{StyleConfiguration, TrailingComma};
 
 impl JSONKeyValuePair {
     fn to_string_styled(&self, style: &mut StyleConfiguration) -> String {
@@ -295,7 +264,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
     fn parse_identifier(&mut self) -> Result<JSONValue, ParsingError> {
         match self.check_and_consume(vec![TokType::Name]) {
             None => self.parse_unary(),
-            Some((span, lexeme)) => {
+            Some((_, lexeme)) => {
                 Ok(JSONValue::Identifier(lexeme.to_string()))
             }
         }
@@ -408,7 +377,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
     fn parse_unary(&mut self) -> Result<JSONValue, ParsingError> {
         match self.check_and_consume(vec![TokType::Plus, TokType::Minus]) {
             None => self.parse_primary(),
-            Some((span, lexeme)) => {
+            Some((span, _)) => {
                 match span.1 {
                     TokType::Plus => {
                         let value = self.parse_unary()?; // TODO: validate value is appropriate for unary
@@ -427,7 +396,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
     fn parse_obj_or_array(&mut self) -> Result<JSONValue, ParsingError> {
         match self.check_and_consume(vec![TokType::LeftBracket, TokType::LeftBrace]) {
             None => self.parse_unary(),
-            Some((span, lexeme)) => {
+            Some((span, _)) => {
                 match span.1 {
                     TokType::LeftBrace => self.parse_object(),
                     TokType::LeftBracket => self.parse_array(),
@@ -446,7 +415,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
         let value = self.parse_value()?;
         match self.advance() {
             None => {}
-            Some((span, lexeme)) => {
+            Some((span, _)) => {
                 if span.1 != TokType::EOF {
                     return Err(self.make_error(format!("Unexpected {:?} token after value", span.1), span.0 - 1))
                 }
@@ -707,7 +676,7 @@ mod tests {
     false,
     null
 ]"#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -717,7 +686,7 @@ mod tests {
         let sample = r#"[
     null,
 ]"#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -730,7 +699,7 @@ mod tests {
         true
     */
 ]"#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -742,7 +711,7 @@ mod tests {
     Some non-comment top-level value is needed;
     we use null above.
 */"#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -750,7 +719,7 @@ mod tests {
     #[test]
     fn test_block_comment_in_string() {
         let sample = r#""This /* block comment */ isn't really a block comment.""#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -762,7 +731,7 @@ mod tests {
     we use null below.
 */
 null"#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -776,7 +745,7 @@ null"#;
  * Like this:
  **/
 true"#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -786,7 +755,7 @@ true"#;
         let sample = r#"[
     false   // true
 ]"#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -794,7 +763,7 @@ true"#;
     #[test]
     fn test_inline_comment_following_top_level_value() {
         let sample = r#"null // Some non-comment top-level value is needed; we use null here."#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -802,7 +771,7 @@ true"#;
     #[test]
     fn test_inline_comment_in_string() {
         let sample = r#""This inline comment // isn't really an inline comment.""#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -811,7 +780,7 @@ true"#;
     fn test_inline_comment_preceding_top_level_value() {
         let sample = r#"// Some non-comment top-level value is needed; we use null below.
 null"#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -989,7 +958,7 @@ null"#;
   ]
 }
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1103,7 +1072,7 @@ null"#;
   ],
 }
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1136,7 +1105,7 @@ multi-line string',
     ],
 }
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1149,7 +1118,7 @@ multi-line string',
   "a": true
 }
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1160,7 +1129,7 @@ multi-line string',
     // This comment is terminated with `\r`.
 }
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1171,7 +1140,7 @@ multi-line string',
     // This comment is terminated with `\r\n`.
 }
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1182,7 +1151,7 @@ multi-line string',
     // This comment is terminated with `\n`.
 }
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1195,7 +1164,7 @@ multi-line string',
 line 2'
 }
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1208,7 +1177,7 @@ line 2'
 line 2'
 }
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1221,7 +1190,7 @@ line 2'
 line 2'
 }
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1230,7 +1199,7 @@ line 2'
     fn test_float_leading_decimal_point() {
         let sample = r#".5
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1239,7 +1208,7 @@ line 2'
     fn test_float_leading_zero() {
         let sample = r#"0.5
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1248,7 +1217,7 @@ line 2'
     fn test_float_trailing_decimal_point_with_integer_exponent() {
         let sample = r#"5.e4
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1257,7 +1226,7 @@ line 2'
     fn test_float_trailing_decimal_point() {
         let sample = r#"5.
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1266,7 +1235,7 @@ line 2'
     fn test_float_with_integer_exponent() {
         let sample = r#"1.2e3
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1275,7 +1244,7 @@ line 2'
     fn test_float() {
         let sample = r#"1.2
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1299,7 +1268,7 @@ line 2'
     fn test_hexadecimal_lowercase_letter() {
         let sample = r#"0xc8
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1308,7 +1277,7 @@ line 2'
     fn test_hexadecimal_uppercase_x() {
         let sample = r#"0XC8
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1317,7 +1286,7 @@ line 2'
     fn test_hexadecimal_with_integer_exponent() {
         let sample = r#"0xc8e4
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1326,7 +1295,7 @@ line 2'
     fn test_hexadecimal() {
         let sample = r#"0xC8
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1335,7 +1304,7 @@ line 2'
     fn test_infinity() {
         let sample = r#"Infinity
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1374,7 +1343,7 @@ line 2'
     fn test_integer_with_integer_exponent() {
         let sample = r#"2e23
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1413,7 +1382,7 @@ line 2'
     fn test_integer_with_negative_integer_exponent() {
         let sample = r#"2e-23
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1422,7 +1391,7 @@ line 2'
     fn test_integer_with_negative_zero_integer_exponent() {
         let sample = r#"5e-0
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1461,7 +1430,7 @@ line 2'
     fn test_integer_with_positive_integer_exponent() {
         let sample = r#"1e+2
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1470,7 +1439,7 @@ line 2'
     fn test_integer_with_positive_zero_integer_exponent() {
         let sample = r#"5e+0
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1479,7 +1448,7 @@ line 2'
     fn test_integer_with_zero_integer_exponent() {
         let sample = r#"5e0
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1488,7 +1457,7 @@ line 2'
     fn test_integer() {
         let sample = r#"15
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1512,7 +1481,7 @@ line 2'
     fn test_nan() {
         let sample = r#"NaN
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1521,7 +1490,7 @@ line 2'
     fn test_negative_float_leading_decimal_point() {
         let sample = r#"-.5
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1530,7 +1499,7 @@ line 2'
     fn test_negative_float_leading_zero() {
         let sample = r#"-0.5
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1539,7 +1508,7 @@ line 2'
     fn test_negative_float_trailing_decimal_point() {
         let sample = r#"-5.
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1548,7 +1517,7 @@ line 2'
     fn test_negative_float() {
         let sample = r#"-1.2
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1557,7 +1526,7 @@ line 2'
     fn test_negative_hexadecimal() {
         let sample = r#"-0xC8
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1566,7 +1535,7 @@ line 2'
     fn test_negative_infinity() {
         let sample = r#"-Infinity
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1575,7 +1544,7 @@ line 2'
     fn test_negative_integer() {
         let sample = r#"-15
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1614,7 +1583,7 @@ line 2'
     fn test_negative_zero_float_leading_decimal_point() {
         let sample = r#"-.0
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1623,7 +1592,7 @@ line 2'
     fn test_negative_zero_float_trailing_decimal_point() {
         let sample = r#"-0.
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1632,7 +1601,7 @@ line 2'
     fn test_negative_zero_float() {
         let sample = r#"-0.0
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1641,7 +1610,7 @@ line 2'
     fn test_negative_zero_hexadecimal() {
         let sample = r#"-0x0
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1650,7 +1619,7 @@ line 2'
     fn test_negative_zero_integer() {
         let sample = r#"-0
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1719,7 +1688,7 @@ line 2'
     fn test_positive_float_leading_decimal_point() {
         let sample = r#"+.5
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1728,7 +1697,7 @@ line 2'
     fn test_positive_float_leading_zero() {
         let sample = r#"+0.5
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1737,7 +1706,7 @@ line 2'
     fn test_positive_float_trailing_decimal_point() {
         let sample = r#"+5.
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1746,7 +1715,7 @@ line 2'
     fn test_positive_float() {
         let sample = r#"+1.2
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1755,7 +1724,7 @@ line 2'
     fn test_positive_hexadecimal() {
         let sample = r#"+0xC8
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1764,7 +1733,7 @@ line 2'
     fn test_positive_infinity() {
         let sample = r#"+Infinity
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1773,7 +1742,7 @@ line 2'
     fn test_positive_integer() {
         let sample = r#"+15
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1812,7 +1781,7 @@ line 2'
     fn test_positive_zero_float_leading_decimal_point() {
         let sample = r#"+.0
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1821,7 +1790,7 @@ line 2'
     fn test_positive_zero_float_trailing_decimal_point() {
         let sample = r#"+0.
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1830,7 +1799,7 @@ line 2'
     fn test_positive_zero_float() {
         let sample = r#"+0.0
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1839,7 +1808,7 @@ line 2'
     fn test_positive_zero_hexadecimal() {
         let sample = r#"+0x0
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1848,7 +1817,7 @@ line 2'
     fn test_positive_zero_integer() {
         let sample = r#"+0
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1872,7 +1841,7 @@ line 2'
     fn test_zero_float_leading_decimal_point() {
         let sample = r#".0
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1881,7 +1850,7 @@ line 2'
     fn test_zero_float_trailing_decimal_point() {
         let sample = r#"0.
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1890,7 +1859,7 @@ line 2'
     fn test_zero_float() {
         let sample = r#"0.0
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1899,7 +1868,7 @@ line 2'
     fn test_zero_hexadecimal() {
         let sample = r#"0x0
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1908,7 +1877,7 @@ line 2'
     fn test_zero_integer_with_integer_exponent() {
         let sample = r#"0e23
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1917,7 +1886,7 @@ line 2'
     fn test_zero_integer() {
         let sample = r#"0
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1944,7 +1913,7 @@ line 2'
     "a": false
 }
 "#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -1952,7 +1921,7 @@ line 2'
     #[test]
     fn test_empty_object() {
         let sample = r#"{}"#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -2043,7 +2012,7 @@ line 2'
         let sample = r#"{
     while: true
 }"#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -2053,7 +2022,7 @@ line 2'
         let sample = r#"{
     'hello': "world"
 }"#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -2063,7 +2032,7 @@ line 2'
         let sample = r#"{
     "foo": "bar",
 }"#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -2078,7 +2047,7 @@ line 2'
     _$_: "multiple symbols",
     $_$hello123world_$_: "mixed"
 }"#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -2086,7 +2055,7 @@ line 2'
     #[test]
     fn test_escaped_single_quoted_string() {
         let sample = r#"'I can\'t wait'"#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -2095,7 +2064,7 @@ line 2'
     fn test_multi_line_string() {
         let sample = r#"'hello\
  world'"#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 
@@ -2103,7 +2072,7 @@ line 2'
     #[test]
     fn test_single_quoted_string() {
         let sample = r#"'hello world'"#;
-        let res = from_str(sample).unwrap();
+        let _res = from_str(sample).unwrap();
     }
 
 

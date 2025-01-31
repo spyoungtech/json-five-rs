@@ -26,7 +26,7 @@ pub(crate) enum TokType {
     Nan,
     Exponent,
     Hexadecimal,
-    Octal,
+    // Octal,
     Plus,
     Minus,
     EOF,
@@ -84,7 +84,7 @@ const HEX_CHARS: &str = "0123456789abcdefABCDEF";
 const IDENTIFIER_SYMBOLS: &str = "$_";
 
 #[derive(Debug)]
-struct TokenizerConfig {
+pub struct TokenizerConfig {
     pub include_whitespace: bool,
     pub include_comments: bool,
     pub allow_octal: bool,
@@ -173,7 +173,7 @@ impl <'input> Tokenizer<'input> {
     }
 
     fn process_octal(&mut self) -> Result<TokenSpan, TokenizationError> {
-        let (start_idx, start_char) = self.lookahead.expect("Unexpected end of input, was processing octal");
+        let (start_idx, _start_char) = self.lookahead.expect("Unexpected end of input, was processing octal");
         if self.configuration.allow_octal {
             todo!()
         } else {
@@ -401,10 +401,9 @@ impl <'input> Tokenizer<'input> {
                         None => {
                             return Err(self.make_error("Unexpected end of input while processing block comment".to_string(), start_idx))
                         }
-                        Some((peeked_idx, peeked_char)) => {
+                        Some((_peeked_idx, peeked_char)) => {
                             match peeked_char {
                                 '*' => {
-                                    last_idx = *peeked_idx;
                                     self.advance();
                                     let maybe_next_next = self.chars.peek();
                                     match maybe_next_next {
@@ -425,7 +424,6 @@ impl <'input> Tokenizer<'input> {
                                     }
                                 }
                                 _ => {
-                                    last_idx = *peeked_idx;
                                     self.advance();
                                     continue
                                 }
@@ -472,7 +470,14 @@ impl <'input> Tokenizer<'input> {
                     '/' => {
                         let (_, next_next) = self.chars.peek().unwrap_or(&(usize::MAX, '!'));
                         match next_next {
-                            '/' | '*' => self.process_comment(),
+                            '/' | '*' => {
+                                if self.configuration.include_comments {
+                                    self.process_comment()
+                                } else {
+                                    self.process_comment()?;
+                                    self.next_token()
+                                }
+                            },
                             _ => {
                                 return Err(self.make_error("unexpected token '/'".to_string(), next_idx))
                             }

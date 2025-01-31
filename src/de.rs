@@ -1,6 +1,6 @@
-use serde::de::{self, DeserializeSeed, Deserialize, Deserializer, Error as DeError, MapAccess, SeqAccess, VariantAccess, Visitor};
+use serde::de::{self, DeserializeSeed, Deserialize, Deserializer, MapAccess, SeqAccess, VariantAccess, Visitor};
 use std::fmt;
-use crate::parser::{JSONText, JSONValue, JSONKeyValuePair, UnaryOperator, ParsingError, from_str as model_from_str};
+use crate::parser::{JSONValue, JSONKeyValuePair, UnaryOperator, from_str as model_from_str};
 #[derive(Debug)]
 pub enum SerdeJSON5Error {
     Custom(String),

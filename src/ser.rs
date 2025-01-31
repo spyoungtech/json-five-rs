@@ -7,7 +7,6 @@ use serde::ser::{
     SerializeStructVariant, SerializeTupleVariant, SerializeTupleStruct
 };
 use std::fmt;
-use crate::parser::JSONValue::DoubleQuotedString;
 
 pub fn to_json_model<T>(value: &T) -> Result<JSONText, SerdeJSON5Error>
 where
@@ -230,7 +229,6 @@ impl SerializeStruct for CompoundMap {
 pub struct CompoundMapVariant {
     pub variant: String,
     pub pairs: Vec<JSONKeyValuePair>,
-    pub next_key: Option<JSONValue>,
 }
 
 impl SerializeStructVariant for CompoundMapVariant {
@@ -487,7 +485,6 @@ impl Serializer for JSONValueSerializer {
         Ok(CompoundMapVariant {
             variant: variant.to_string(),
             pairs: Vec::new(),
-            next_key: None,
         })
     }
 }
