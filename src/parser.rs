@@ -54,7 +54,7 @@ pub(crate) enum TrailingComma {
 pub(crate) struct StyleConfiguration {
     pub(crate) indent: Option<usize>,
     pub(crate) item_separator: String,
-    key_separator: String,
+    pub(crate) key_separator: String,
     pub(crate) current_indent: usize,
     pub(crate) trailing_comma: TrailingComma
 }
@@ -154,8 +154,47 @@ impl<'input> JSONValue<'input> {
                 }
                 ret
             }
-            JSONValue::JSONArray { .. } => {
-                todo!()
+            JSONValue::JSONArray { values } => {
+                let mut ret: String;
+
+                match style.indent {
+                    None => {
+                        ret = String::from("[");
+                    }
+                    Some(ident) => {
+                        style.current_indent += ident;
+                        ret = format!("{{\n{}", style.current_indent);
+                    }
+                }
+                for (idx, value) in values.iter().enumerate() {
+                    ret.push_str(value.to_string_styled(style).as_str());
+                    if idx < values.len() - 1 {
+                        match style.indent {
+                            None => {
+                                ret.push_str(style.item_separator.as_str());
+                            }
+                            Some(_) => {
+                                ret.push_str(format!(",\n{}", style.current_indent).as_str())
+                            }
+                        }
+                    }
+                }
+                match style.trailing_comma {
+                    TrailingComma::ALL | TrailingComma::ARRAYS => {
+                        ret.push(',');
+                    }
+                    _ => {}
+                }
+                match style.indent {
+                    None => {
+                        ret.push_str("]");
+                    }
+                    Some(ident) => {
+                        style.current_indent -= ident;
+                        ret.push_str(format!("\n{}}}", style.current_indent).as_str());
+                    }
+                }
+                ret
             }
         }
     }
@@ -173,7 +212,7 @@ impl<'input> Display for JSONValue<'input> {
 
 impl<'input> Display for JSONText<'input> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.value.to_string())
+        write!(f, "{}", self.value.to_string_styled(&mut StyleConfiguration::default()))
     }
 }
 

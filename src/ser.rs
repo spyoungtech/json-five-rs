@@ -21,15 +21,8 @@ pub fn to_string<T>(value: &T) -> Result<String, SerdeJSON5Error>
 where
     T: Serialize
 {
-    let serializer = JSONValueSerializer;
-    let maybe_model = value.serialize(serializer);
-    match maybe_model {
-        Err(e) => {Err(SerdeJSON5Error::Custom(e.to_string()))}
-        Ok(model) => {
-            Ok(model.to_string())
-        }
-    }
-
+    let model = to_json_model(value)?;
+    Ok(model.to_string())
 }
 
 #[derive(Debug)]
@@ -539,5 +532,13 @@ mod tests {
             }
             Err(e) => eprintln!("Error: {:?}", e)
         }
+    }
+
+    #[test]
+    fn test_to_string() {
+        let mut example: HashMap<String, String> = HashMap::new();
+        example.insert("foo".to_string(), "bar".to_string());
+        let y = to_string(&example).unwrap();
+        println!("{:?}", y);
     }
 }

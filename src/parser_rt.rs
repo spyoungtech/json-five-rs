@@ -6,7 +6,7 @@ use crate::tokenize::{TokenSpan, TokType};
 use crate::tokenize::Tokens;
 use crate::tokenize::TokType::{Colon, Comma, RightBrace};
 use crate::utils::get_line_col_char;
-
+use crate::parser::UnaryOperator;
 
 #[derive(PartialEq, Debug)]
 pub struct JSONKeyValuePair {
@@ -14,12 +14,6 @@ pub struct JSONKeyValuePair {
     pub(crate) value: JSONValue,
 }
 
-
-#[derive(PartialEq, Debug)]
-pub enum UnaryOperator {
-    Plus,
-    Minus,
-}
 
 
 #[derive(PartialEq, Debug)]
@@ -51,7 +45,7 @@ use crate::parser::{StyleConfiguration, TrailingComma};
 
 impl JSONKeyValuePair {
     fn to_string_styled(&self, style: &mut StyleConfiguration) -> String {
-        format!("{}{}{}", self.key.to_string_styled(style), style.item_separator, self.value)
+        format!("{}{}{}", self.key.to_string_styled(style), style.key_separator, self.value)
     }
 }
 
@@ -71,9 +65,9 @@ impl JSONValue {
                 format!("'{}'", s)
             }
 
-            JSONValue::Null => {format!("null")}
-            JSONValue::Infinity => {format!("Infinity")}
-            JSONValue::NaN => {format!("NaN")}
+            JSONValue::Null => {"null".to_string()}
+            JSONValue::Infinity => {"Infinity".to_string()}
+            JSONValue::NaN => {"NaN".to_string()}
 
             JSONValue::Unary { operator, value } => {
                 let op_char = match operator {
@@ -110,26 +104,67 @@ impl JSONValue {
                 }
                 match style.trailing_comma {
                     TrailingComma::ALL | TrailingComma::OBJECTS => {
-                        ret.push(',')
+                        ret.push(',');
                     }
                     _ => {}
                 }
                 match style.indent {
                     None => {
-                        todo!()
+                        ret.push_str("}");
                     }
                     Some(ident) => {
-                        todo!()
+                        style.current_indent -= ident;
+                        ret.push_str(format!("\n{}}}", style.current_indent).as_str());
                     }
                 }
+                ret
             }
-            JSONValue::JSONArray { .. } => {
-                todo!()
-            }
+            JSONValue::JSONArray { values } => {
+                let mut ret: String;
 
+                match style.indent {
+                    None => {
+                        ret = String::from("[");
+                    }
+                    Some(ident) => {
+                        style.current_indent += ident;
+                        ret = format!("{{\n{}", style.current_indent);
+                    }
+                }
+                for (idx, value) in values.iter().enumerate() {
+                    ret.push_str(value.to_string_styled(style).as_str());
+                    if idx < values.len() - 1 {
+                        match style.indent {
+                            None => {
+                                ret.push_str(style.item_separator.as_str());
+                            }
+                            Some(_) => {
+                                ret.push_str(format!(",\n{}", style.current_indent).as_str())
+                            }
+                        }
+                    }
+                }
+                match style.trailing_comma {
+                    TrailingComma::ALL | TrailingComma::ARRAYS => {
+                        ret.push(',');
+                    }
+                    _ => {}
+                }
+                match style.indent {
+                    None => {
+                        ret.push_str("]");
+                    }
+                    Some(ident) => {
+                        style.current_indent -= ident;
+                        ret.push_str(format!("\n{}}}", style.current_indent).as_str());
+                    }
+                }
+                ret
+            }
         }
     }
 }
+
 
 
 impl Display for JSONValue {

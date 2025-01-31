@@ -50,10 +50,6 @@ impl<'input> Tokens<'input> {
     pub(crate) fn spans_with_source(&self) -> Vec<(&TokenSpan, &'input str)> {
         self.tok_spans.iter().map(|span| (span, &self.source[span.0 .. span.2])).collect()
     }
-
-    pub(crate) fn get_source(&self, tokspan: TokenSpan) -> &'input str {
-        &self.source[tokspan.0 .. tokspan.2]
-    }
 }
 
 #[derive(Debug)]
@@ -506,6 +502,11 @@ impl <'input> Tokenizer<'input> {
 
 pub fn tokenize_str(text: &'_ str) -> Result<Tokens<'_>, TokenizationError> {
     Tokenizer::new(text).tokenize()
+}
+
+pub fn tokenize_rt_str(text: &'_ str) -> Result<Tokens<'_>, TokenizationError> {
+    let config = TokenizerConfig{include_comments: true, include_whitespace: true, allow_octal: false};
+    Tokenizer::with_configuration(text, config).tokenize()
 }
 
 #[cfg(test)]
