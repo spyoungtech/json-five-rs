@@ -1,4 +1,4 @@
-use crate::parser::{JSONValue, JSONText, JSONKeyValuePair, UnaryOperator};
+use crate::parser_rt::{JSONValue, JSONText, JSONKeyValuePair};
 
 
 
@@ -65,7 +65,7 @@ impl CompoundSeq {
 
     fn serialize_element_impl<T>(&mut self, value: &T) -> Result<(), SerdeJSON5Error>
     where
-        T: ?Sized + serde::Serialize,
+        T: ?Sized + Serialize,
     {
         let val = value.serialize(JSONValueSerializer)?;
         self.elements.push(val);
@@ -493,7 +493,7 @@ impl Serializer for JSONValueSerializer {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::collections::HashMap;
     use super::*;
     use serde::Serialize;
@@ -532,15 +532,15 @@ mod test {
 
     #[test]
     fn test_hashmap() {
-        use crate::parser::{JSONValue, JSONKeyValuePair, JSONText};
+        use crate::parser_rt::{JSONValue, JSONKeyValuePair, JSONText};
         let mut example: HashMap<String, String> = HashMap::new();
         example.insert("foo".to_string(), "bar".to_string());
         match to_json_model(&example) {
             Ok(val) => {
-                let expected = JSONValue::JSONObject { key_value_pairs: vec![JSONKeyValuePair { key: JSONValue::DoubleQuotedString("foo".to_string()), value: JSONValue::DoubleQuotedString("bar".to_string()) }] };
-                assert_eq!(val, expected)
+                let expected = JSONText{ value: JSONValue::JSONObject { key_value_pairs: vec![JSONKeyValuePair { key: JSONValue::DoubleQuotedString("foo".to_string()), value: JSONValue::DoubleQuotedString("bar".to_string()) }] }};
+                assert_eq!(val, expected);
             }
-            Err(e) => eprintln!("Error: {:?}", e),
+            Err(e) => eprintln!("Error: {:?}", e)
         }
     }
 }

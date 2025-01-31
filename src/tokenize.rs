@@ -41,7 +41,7 @@ pub(crate) type TokenSpan = (usize, TokType, usize);
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct Tokens<'input> {
-    tok_spans: Vec<TokenSpan>,
+    pub (crate) tok_spans: Vec<TokenSpan>,
     pub (crate) source: &'input str
 }
 
@@ -49,6 +49,10 @@ pub(crate) struct Tokens<'input> {
 impl<'input> Tokens<'input> {
     pub(crate) fn spans_with_source(&self) -> Vec<(&TokenSpan, &'input str)> {
         self.tok_spans.iter().map(|span| (span, &self.source[span.0 .. span.2])).collect()
+    }
+
+    pub(crate) fn get_source(&self, tokspan: TokenSpan) -> &'input str {
+        &self.source[tokspan.0 .. tokspan.2]
     }
 }
 

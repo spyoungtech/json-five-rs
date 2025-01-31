@@ -25,7 +25,7 @@ impl de::Error for SerdeJSON5Error {
 /// A small helper that wraps our `JSONValue` and implements
 /// `serde::Deserializer`.
 struct JSONValueDeserializer<'a> {
-    input: &'a JSONValue,
+    input: &'a JSONValue<'a>,
 }
 
 
@@ -41,9 +41,9 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
             JSONValue::Null => visitor.visit_unit(),
             JSONValue::Bool(b) => visitor.visit_bool(*b),
             JSONValue::DoubleQuotedString(s) | JSONValue::SingleQuotedString(s) => {
-                visitor.visit_string(s.clone())
+                visitor.visit_str(s)
             }
-            JSONValue::Identifier(s) => visitor.visit_string(s.clone()),
+            JSONValue::Identifier(s) => visitor.visit_str(s),
             JSONValue::JSONObject { key_value_pairs } => {
                 // Treat as a map
                 let mut map_deserializer = JSONMapAccess {
@@ -364,7 +364,7 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
         match self.input {
             JSONValue::Identifier(ident) => {
                 // We'll treat the entire enum as a single variant with no payload:
-                visitor.visit_enum(ident.as_str().into_deserializer())
+                visitor.visit_enum(ident.into_deserializer())
             }
             JSONValue::JSONObject { key_value_pairs } if !key_value_pairs.is_empty() => {
                 // Possibly the first key is your variant, the value is the data.
@@ -405,7 +405,7 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
 
 /// Minimal SeqAccess implementation for arrays
 struct JSONSeqAccess<'a> {
-    values: &'a [JSONValue],
+    values: &'a [JSONValue<'a>],
     index: usize,
 }
 
@@ -430,7 +430,7 @@ impl<'de, 'a> SeqAccess<'de> for JSONSeqAccess<'a> {
 
 /// Minimal MapAccess implementation for objects
 struct JSONMapAccess<'a> {
-    pairs: &'a [JSONKeyValuePair],
+    pairs: &'a [JSONKeyValuePair<'a>],
     index: usize,
 }
 
@@ -465,8 +465,8 @@ impl<'de, 'a> MapAccess<'de> for JSONMapAccess<'a> {
 
 /// If you need to handle complex enum representations:
 struct EnumDeserializer<'a> {
-    variant: &'a String,
-    content: &'a JSONValue,
+    variant: &'a str,
+    content: &'a JSONValue<'a>,
 }
 
 impl<'de, 'a> de::EnumAccess<'de> for EnumDeserializer<'a> {
@@ -478,7 +478,7 @@ impl<'de, 'a> de::EnumAccess<'de> for EnumDeserializer<'a> {
         V: DeserializeSeed<'de>,
     {
         use serde::de::IntoDeserializer;
-        let val = seed.deserialize(self.variant.as_str().into_deserializer())?;
+        let val = seed.deserialize(self.variant.into_deserializer())?;
         Ok((val, JSONValueDeserializer { input: self.content }))
     }
 }
