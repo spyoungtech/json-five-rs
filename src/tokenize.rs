@@ -4,7 +4,7 @@ use std::str::{CharIndices};
 use crate::utils::get_line_col_char;
 
 #[derive(PartialEq, Clone, Debug)]
-pub(crate) enum TokType {
+pub enum TokType {
     LeftBrace,
     RightBrace,
     LeftBracket,
@@ -40,9 +40,9 @@ pub(crate) type TokenSpan = (usize, TokType, usize);
 
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Tokens<'input> {
-    pub (crate) tok_spans: Vec<TokenSpan>,
-    pub (crate) source: &'input str
+pub struct Tokens<'input> {
+    pub tok_spans: Vec<TokenSpan>,
+    pub source: &'input str
 }
 
 
@@ -53,12 +53,12 @@ impl<'input> Tokens<'input> {
 }
 
 #[derive(Debug)]
-pub (crate) struct TokenizationError {
-    pub(crate) message: String,
-    pub(crate) index: usize, // byte offset
-    pub(crate) lineno: usize,
-    pub(crate) colno: usize,
-    pub(crate) char_index: usize // char offset
+pub struct TokenizationError {
+    pub message: String,
+    pub index: usize, // byte offset
+    pub lineno: usize,
+    pub colno: usize,
+    pub char_index: usize // char offset
 }
 
 impl<'input> Display for TokenizationError {
@@ -536,6 +536,14 @@ mod test {
         let expected = Tokens{ tok_spans: vec![(0, LeftBrace, 1), (1, DoubleQuotedString, 6), (6, Colon, 7), (7, DoubleQuotedString, 12), (12, RightBrace, 13), (13, EOF, 13)], source: text};
         assert_eq!(toks, expected)
     }
+    #[test]
+    fn test_heck3() {
+        let text = "{\"foo\":\"bar\"}";
+        let toks = tokenize_rt_str(text).unwrap();
+        let expected = Tokens{ tok_spans: vec![(0, LeftBrace, 1), (1, DoubleQuotedString, 6), (6, Colon, 7), (7, DoubleQuotedString, 12), (12, RightBrace, 13), (13, EOF, 13)], source: text};
+        assert_eq!(toks, expected)
+    }
+
 
     #[test]
     fn test_single_quoted_string() {

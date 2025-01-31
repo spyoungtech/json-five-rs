@@ -567,6 +567,7 @@ mod test {
         match from_str::<MyData>(source) {
             Ok(data) => {
                 println!("Parsed data: {:?}", data);
+                println!("{}{}{:?}", data.name, data.count, data.maybe)
             }
             Err(e) => {
                 println!("Error: {:?}", e);

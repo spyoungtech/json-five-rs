@@ -43,8 +43,8 @@ pub enum JSONValue<'input> {
 pub struct JSONText<'input> {
     pub(crate) value: JSONValue<'input>,
 }
-
-pub(crate) enum TrailingComma {
+#[allow(dead_code)]
+pub enum TrailingComma {
     ALL,
     OBJECTS,
     ARRAYS,
@@ -59,6 +59,7 @@ pub(crate) struct StyleConfiguration {
     pub(crate) trailing_comma: TrailingComma
 }
 
+#[allow(dead_code)]
 impl StyleConfiguration {
     pub fn new(indent: Option<usize>, item_separator: &str, key_separator: &str, trailing_comma: TrailingComma) -> Self {
         StyleConfiguration{indent: indent, item_separator: item_separator.to_string(), key_separator: key_separator.to_string(), current_indent: 0, trailing_comma: trailing_comma}
