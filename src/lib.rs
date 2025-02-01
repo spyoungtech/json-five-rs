@@ -1,9 +1,10 @@
-mod tokenize;
+pub mod tokenize;
 mod utils;
-mod parser;
+pub mod parser;
+#[cfg(feature = "serde")]
+pub mod de;
+#[cfg(feature = "serde")]
+pub mod ser;
 
-#[cfg(feature = "serde")]
-mod de;
-#[cfg(feature = "serde")]
-mod ser;
+mod parser_rt;
 
