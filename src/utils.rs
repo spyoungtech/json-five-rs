@@ -27,3 +27,43 @@ pub(crate) fn get_line_col_char(doc: &str, byte_offset: usize) -> (usize, usize,
     panic!("Reached end of document")
 }
 
+
+pub (crate) fn escape_double_quoted(input: &str) -> String {
+    // In the worst case (every char requires a backslash), the output could
+    // be roughly twice the length of `input`.
+    let mut escaped = String::with_capacity(input.len() * 2);
+
+    for c in input.chars() {
+        match c {
+            '"'  => { escaped.push('\\'); escaped.push('"');  }
+            '\\' => { escaped.push('\\'); escaped.push('\\'); }
+            '\n' => { escaped.push('\\'); escaped.push('n');  }
+            '\r' => { escaped.push('\\'); escaped.push('r');  }
+            '\t' => { escaped.push('\\'); escaped.push('t');  }
+            '/'  => { escaped.push('\\'); escaped.push('/');  }
+            '\u{0008}' => { escaped.push('\\'); escaped.push('b'); }
+            '\u{000c}' => { escaped.push('\\'); escaped.push('f'); }
+            _ => escaped.push(c),
+        }
+    }
+
+    escaped
+}
+
+pub (crate) fn escape_single_quoted(input: &str) -> String {
+    let mut escaped = String::with_capacity(input.len() * 2);
+    for c in input.chars() {
+        match c {
+            '\''  => { escaped.push('\\'); escaped.push('"');  }
+            '\\' => { escaped.push('\\'); escaped.push('\\'); }
+            '\n' => { escaped.push('\\'); escaped.push('n');  }
+            '\r' => { escaped.push('\\'); escaped.push('r');  }
+            '\t' => { escaped.push('\\'); escaped.push('t');  }
+            '/'  => { escaped.push('\\'); escaped.push('/');  }
+            '\u{0008}' => { escaped.push('\\'); escaped.push('b'); }
+            '\u{000c}' => { escaped.push('\\'); escaped.push('f'); }
+            _ => escaped.push(c),
+        }
+    }
+    escaped
+}
