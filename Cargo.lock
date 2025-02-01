@@ -7,6 +7,7 @@ name = "json-five-rs"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "unicode-general-category",
 ]
 
 [[package]]
@@ -57,6 +58,12 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "unicode-general-category"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24adfe8311434967077a6adff125729161e6e4934d76f6b7c55318ac5c9246d3"
 
 [[package]]
 name = "unicode-ident"

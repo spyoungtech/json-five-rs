@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 serde = { version = "1.0", optional = true }
-
+unicode-general-category = { version = "1.0" }
 [features]
 default = ["serde"]
 serde = ["dep:serde"]

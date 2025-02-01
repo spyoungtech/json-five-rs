@@ -78,8 +78,8 @@ pub(crate) struct Tokenizer<'input> {
 
 
 const HEX_CHARS: &str = "0123456789abcdefABCDEF";
-const IDENTIFIER_SYMBOLS: &str = "$_";
-
+const IDENTIFIER_START_SYMBOLS: &str = "$_";
+const IDENTIFIER_PARTS: &str = "$_\u{200C}\u{200D}\u{005F}\u{203F}\u{2040}\u{2054}\u{FE33}\u{FE34}\u{FE4D}\u{FE4E}\u{FE4F}\u{FF3F}";
 #[derive(Debug)]
 pub struct TokenizerConfig {
     pub include_whitespace: bool,
@@ -340,10 +340,44 @@ impl <'input> Tokenizer<'input> {
     }
 
     fn process_identifier_or_const(&mut self) -> Result<TokenSpan, TokenizationError> {
-        let (start_idx, _start_char) = self.lookahead.expect("Unexpected end of input, was expecting identifier/const char");
+        let (start_idx, start_char) = self.lookahead.expect("Unexpected end of input, was expecting identifier/const char");
         let mut last_idx = start_idx;
-
-        // TODO: ensure that the first character is a valid identifier start character
+        use unicode_general_category::{get_general_category, GeneralCategory};
+        match start_char {
+            c if c.is_alphabetic() => {}
+            c if IDENTIFIER_START_SYMBOLS.contains(c) => {}
+            '\\' => {
+                match self.chars.peek() {
+                    None => {return Err(self.make_error("Unexpected EOF".to_string(), start_idx))}
+                    Some((_, c)) => {
+                        match c {
+                            'u' => {
+                                self.advance();
+                                for _ in 0..4 {
+                                    match self.advance() {
+                                        None => {
+                                            return Err(self.make_error("Invalid identifier start".to_string(), start_idx))
+                                        }
+                                        Some((idx, c)) => {
+                                            last_idx = idx;
+                                            if !HEX_CHARS.contains(c) {
+                                                return Err(self.make_error("Invalid identifier start".to_string(), start_idx))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            _ => {
+                                return Err(self.make_error("Invalid identifier start".to_string(), start_idx))
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {
+                return Err(self.make_error(format!("Invalid character {}", start_char), start_idx))
+            }
+        }
 
         loop {
             match self.chars.peek() {
@@ -355,13 +389,49 @@ impl <'input> Tokenizer<'input> {
                         last_idx = *next_idx;
                         self.advance();
                         continue
-                    } else if IDENTIFIER_SYMBOLS.contains(*next_char) {
+                    } else if IDENTIFIER_PARTS.contains(*next_char) {
                         last_idx = *next_idx;
                         self.advance();
                         continue
+                    } else if *next_char == '\\' {
+                        self.advance();
+                        match self.advance() {
+                            None => {return Err(self.make_error("Unexpected EOF".to_string(), start_idx))}
+                            Some((_, c)) => {
+                                match c {
+                                    'u' => {
+                                        for _ in 0..4 {
+                                            match self.advance() {
+                                                None => {
+                                                    return Err(self.make_error("Invalid unquoted key1".to_string(), start_idx))
+                                                }
+                                                Some((_, c)) => {
+                                                    if !HEX_CHARS.contains(c) {
+
+                                                        return Err(self.make_error("Invalid unquoted key2".to_string(), start_idx))
+                                                    }
+
+                                                }
+                                            }
+                                        }
+                                        last_idx = self.lookahead.unwrap().0
+                                    }
+                                    _ => {
+                                        return Err(self.make_error("Invalid unquoted key3".to_string(), start_idx))
+                                    }
+                                }
+                            }
+                        }
                     } else {
-                        break self.tok_from_indices(start_idx, last_idx + 1)
-                    } // TODO: handle unicode escape sequences
+                        match get_general_category(*next_char) {
+                            GeneralCategory::NonspacingMark | GeneralCategory::SpacingMark => {
+                                last_idx = *next_idx;
+                                self.advance();
+                                continue
+                            }
+                            _ => break self.tok_from_indices(start_idx, last_idx + 1)
+                        }
+                    }
                 }
             }
         }
@@ -641,7 +711,7 @@ mod test {
     #[test]
     fn test_whitespace() {
         let text = " {\n\t} ";
-        let toks = tokenize_str(text).unwrap();
+        let toks = Tokenizer::with_configuration(text, TokenizerConfig{include_whitespace: true, include_comments: true, allow_octal: false}).tokenize().unwrap();
         let expected = Tokens{ tok_spans: vec![(0, Whitespace, 1), (1, LeftBrace, 2), (2, Whitespace, 4), (4, RightBrace, 5), (5, Whitespace, 6), (6, EOF, 6)], source: text};
         assert_eq!(toks, expected);
     }
@@ -661,5 +731,19 @@ mod test {
         let expected = Tokens{source: text, tok_spans: vec![(0, Integer, 3), (3, EOF, 3)]};
         assert_eq!(toks, expected);
 
+    }
+
+    #[test]
+    fn test_unexpected_symbol() {
+        let text = "1!2";
+        let e = tokenize_str(text).unwrap_err();
+    }
+
+    #[test]
+    fn test_special_things() {
+        let text = r#"{$_:1,_$:2,a\u200C:3}"#;
+        let toks = tokenize_str(text).unwrap();
+        let expected = Tokens{source: text, tok_spans: vec![(0, LeftBrace, 1), (1, Name, 3), (3, Colon, 4), (4, Integer, 5), (5, Comma, 6), (6, Name, 8), (8, Colon, 9), (9, Integer, 10), (10, Comma, 11), (11, Name, 18), (18, Colon, 19), (19, Integer, 20), (20, RightBrace, 21), (21, EOF, 21)]};
+        assert_eq!(toks, expected)
     }
 }
