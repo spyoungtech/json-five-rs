@@ -6,5 +6,5 @@ pub mod de;
 #[cfg(feature = "serde")]
 pub mod ser;
 
-pub mod parser_rt;
+mod parser_rt;
 
