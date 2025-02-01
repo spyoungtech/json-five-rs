@@ -1,4 +1,5 @@
 use std::fmt::{Display, Formatter};
+use std::io::Read;
 use std::iter::{Peekable};
 use std::str::{CharIndices};
 use crate::utils::get_line_col_char;
@@ -88,7 +89,7 @@ pub struct TokenizerConfig {
 
 impl TokenizerConfig {
     pub fn new() -> Self {
-        TokenizerConfig {include_whitespace: true, include_comments: true, allow_octal: false}
+        TokenizerConfig {include_whitespace: false, include_comments: false, allow_octal: false}
     }
 }
 
@@ -500,6 +501,25 @@ impl <'input> Tokenizer<'input> {
     }
 }
 
+impl<'input> Iterator for Tokenizer<'input> {
+    type Item = Result<TokenSpan, TokenizationError>;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.next_token() {
+            Ok(span) => {
+                match span.1 {
+                    TokType::EOF => {
+                        None
+                    }
+                    _ => Some(Ok(span))
+                }
+            }
+            Err(e) => {
+                Some(Err(e))
+            }
+        }
+    }
+}
+
 pub fn tokenize_str(text: &'_ str) -> Result<Tokens<'_>, TokenizationError> {
     Tokenizer::new(text).tokenize()
 }
@@ -508,6 +528,47 @@ pub fn tokenize_rt_str(text: &'_ str) -> Result<Tokens<'_>, TokenizationError> {
     let config = TokenizerConfig{include_comments: true, include_whitespace: true, allow_octal: false};
     Tokenizer::with_configuration(text, config).tokenize()
 }
+
+fn tokenize_bytes(bytes: &'_ [u8]) -> Result<Tokens<'_>, TokenizationError> {
+    let maybe_text = std::str::from_utf8(bytes);
+    match maybe_text {
+        Ok(text) => {
+            Tokenizer::new(text).tokenize()
+        }
+        Err(e) => {
+            let valid_point = e.valid_up_to();
+            if valid_point > 0 {
+                let valid_text = std::str::from_utf8(&bytes[..valid_point]).unwrap();
+                let (lineno, colno, char_index) = get_line_col_char(valid_text, valid_point);
+                Err(TokenizationError{message: "Invalid UTF8 at".to_string(), lineno, colno, char_index, index: valid_point})
+            } else {
+                Err(TokenizationError{message: "Invalid UTF8 at".to_string(), lineno: 1, colno: 0, char_index: 0, index: 0})
+            }
+        }
+    }
+}
+
+fn tokenize_rt_bytes(bytes: &'_ [u8]) -> Result<Tokens<'_>, TokenizationError> {
+    let maybe_text = std::str::from_utf8(bytes);
+    match maybe_text {
+        Ok(text) => {
+            let config = TokenizerConfig{include_comments: true, include_whitespace: true, allow_octal: false};
+            Tokenizer::with_configuration(text, config).tokenize()
+        }
+        Err(e) => {
+            let valid_point = e.valid_up_to();
+            if valid_point > 0 {
+                let valid_text = std::str::from_utf8(&bytes[..valid_point]).unwrap();
+                let (lineno, colno, char_index) = get_line_col_char(valid_text, valid_point);
+                Err(TokenizationError{message: "Invalid UTF8 at".to_string(), lineno, colno, char_index, index: valid_point})
+            } else {
+                Err(TokenizationError{message: "Invalid UTF8 at".to_string(), lineno: 1, colno: 0, char_index: 0, index: 0})
+            }
+        }
+    }
+}
+
+
 
 #[cfg(test)]
 mod test {
