@@ -335,19 +335,37 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
         Some((tok, source))
     }
 
-
-    fn parse_identifier(&mut self) -> Result<JSONValue<'input>, ParsingError> {
-        match self.check_and_consume_with_source(vec![TokType::Name]) {
-            None => self.parse_unary(),
-            Some((_, lexeme)) => {
-                Ok(JSONValue::Identifier(lexeme))
+    fn parse_key(&mut self) -> Result<JSONValue<'input>, ParsingError>{
+        // This is a terminal point
+        // We either get a valid key or we bail.
+        match self.check_and_consume_with_source(vec![TokType::Name, TokType::DoubleQuotedString, TokType::SingleQuotedString]) {
+            None => {
+                match self.peek() {
+                    None => {
+                        let idx = self.position();
+                        Err(self.make_error("Unexpected EOF. Was expecting MemberName at".to_string(), idx))
+                    }
+                    Some(span) => {
+                        let src = self.get_tok_source(span);
+                        Err(self.make_error(format!("Invalid token for unquoted key ({}, {:?}) at", span.2, src), span.0))
+                    }
+                }
+            },
+            Some((span, lexeme)) => {
+                match span.1 {
+                    TokType::DoubleQuotedString => {
+                        Ok(JSONValue::DoubleQuotedString(&lexeme[1..lexeme.len() - 1]))
+                    },
+                    TokType:: SingleQuotedString => {
+                        Ok(JSONValue::SingleQuotedString(&lexeme[1..lexeme.len() - 1]))
+                    }
+                    TokType::Name => {
+                        Ok(JSONValue::Identifier(lexeme))
+                    }
+                    _ => panic!("Programming error. Please report this as a bug")
+                }
             }
         }
-    }
-
-    #[inline]
-    fn parse_key(&mut self) -> Result<JSONValue<'input>, ParsingError>{
-        self.parse_identifier()
     }
 
     fn parse_object(&mut self) -> Result<JSONValue<'input>, ParsingError> {
@@ -2357,7 +2375,6 @@ bar"
 
 
     #[test]
-    #[ignore]
     fn test_error_illegal_unquoted_key_number_index() {
         let sample = r#"{
     10twenty: "ten twenty"
@@ -2375,7 +2392,6 @@ bar"
     }
 
     #[test]
-    #[ignore]
     fn test_error_illegal_unquoted_key_number_colno() {
         let sample = r#"{
     10twenty: "ten twenty"
@@ -2551,6 +2567,4 @@ bar"
             assert_eq!(err.colno, 5_usize, "{:?}", err);
         }
     }
-
-
 }
