@@ -24,7 +24,7 @@ impl de::Error for SerdeJSON5Error {
 
 /// A small helper that wraps our `JSONValue` and implements
 /// `serde::Deserializer`.
-struct JSONValueDeserializer<'a> {
+pub struct JSONValueDeserializer<'a> {
     input: &'a JSONValue<'a>,
 }
 

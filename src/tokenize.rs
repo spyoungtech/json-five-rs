@@ -1,5 +1,4 @@
 use std::fmt::{Display, Formatter};
-use std::io::Read;
 use std::iter::{Peekable};
 use std::str::{CharIndices};
 use crate::utils::get_line_col_char;
@@ -599,7 +598,7 @@ pub fn tokenize_rt_str(text: &'_ str) -> Result<Tokens<'_>, TokenizationError> {
     Tokenizer::with_configuration(text, config).tokenize()
 }
 
-fn tokenize_bytes(bytes: &'_ [u8]) -> Result<Tokens<'_>, TokenizationError> {
+pub fn tokenize_bytes(bytes: &'_ [u8]) -> Result<Tokens<'_>, TokenizationError> {
     let maybe_text = std::str::from_utf8(bytes);
     match maybe_text {
         Ok(text) => {
@@ -618,7 +617,7 @@ fn tokenize_bytes(bytes: &'_ [u8]) -> Result<Tokens<'_>, TokenizationError> {
     }
 }
 
-fn tokenize_rt_bytes(bytes: &'_ [u8]) -> Result<Tokens<'_>, TokenizationError> {
+pub fn tokenize_rt_bytes(bytes: &'_ [u8]) -> Result<Tokens<'_>, TokenizationError> {
     let maybe_text = std::str::from_utf8(bytes);
     match maybe_text {
         Ok(text) => {
@@ -736,7 +735,7 @@ mod test {
     #[test]
     fn test_unexpected_symbol() {
         let text = "1!2";
-        let e = tokenize_str(text).unwrap_err();
+        tokenize_str(text).unwrap_err();
     }
 
     #[test]

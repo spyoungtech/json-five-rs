@@ -51,7 +51,7 @@ pub enum TrailingComma {
     NONE
 }
 
-pub(crate) struct StyleConfiguration {
+pub struct StyleConfiguration {
     pub(crate) indent: Option<usize>,
     pub(crate) item_separator: String,
     pub(crate) key_separator: String,

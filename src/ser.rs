@@ -1,7 +1,7 @@
 use serde::{ser, Serialize};
-use crate::parser::{JSONValue, JSONText, JSONKeyValuePair, ParsingError, TrailingComma};
+use crate::parser::{TrailingComma};
 use std::fmt;
-use crate::utils::{escape_double_quoted, escape_single_quoted};
+use crate::utils::{escape_double_quoted};
 
 #[derive(Debug)]
 pub enum SerdeJSON5Error {
