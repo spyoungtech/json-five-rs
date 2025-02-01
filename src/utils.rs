@@ -1,46 +1,3 @@
-pub(crate) fn get_byte_to_code_point(haystack: &str) -> Vec<usize> {
-    // copied from https://github.com/G-Research/ahocorasick_rs/blob/034e3f67e12198c08137bb9fb3153cb01cf5da31/src/lib.rs#L72-L88
-
-    // Map UTF-8 byte index to Unicode code point index
-
-    let mut byte_to_code_point = vec![usize::MAX; haystack.len() + 1];
-    let mut max_codepoint = 0;
-    for (codepoint_off, (byte_off, _)) in haystack.char_indices().enumerate() {
-        byte_to_code_point[byte_off] = codepoint_off;
-        max_codepoint = codepoint_off;
-    }
-    // End index is exclusive (e.g. 0:3 is first 3 characters), so handle
-    // the case where pattern is at end of string.
-    if !haystack.is_empty() {
-        byte_to_code_point[haystack.len()] = max_codepoint + 1;
-    }
-    byte_to_code_point
-}
-
-pub(crate) fn get_partial_byte_to_code_point(haystack: &str, stop_byte_offset: usize) -> Vec<usize> {
-    // A slight optimization of `get_byte_to_code_point` that lets you stop at a certain
-    // byte offset instead of processing the whole haystack
-    // Useful for when an error message is localized to a particular token
-    // For example, if the offset conversion needed toward the beginning of a very long haystack
-    assert!(stop_byte_offset < haystack.len());
-    let mut byte_to_code_point = vec![usize::MAX; stop_byte_offset + 1];
-    let mut max_codepoint = 0;
-    for (codepoint_off, (byte_off, _)) in haystack.char_indices().enumerate() {
-        byte_to_code_point[byte_off] = codepoint_off;
-        max_codepoint = codepoint_off;
-        if byte_off >= stop_byte_offset {
-            break
-        }
-    }
-    // End index is exclusive (e.g. 0:3 is first 3 characters), so handle
-    // the case where pattern is at end of string.
-    if !haystack.is_empty() {
-        byte_to_code_point[haystack.len()] = max_codepoint + 1;
-    }
-    byte_to_code_point
-}
-
-
 pub(crate) fn get_line_col_char(doc: &str, byte_offset: usize) -> (usize, usize, usize) {
     let mut lineno: usize = 1;
     let mut colno: usize = 0;
@@ -70,3 +27,43 @@ pub(crate) fn get_line_col_char(doc: &str, byte_offset: usize) -> (usize, usize,
     panic!("Reached end of document")
 }
 
+
+pub (crate) fn escape_double_quoted(input: &str) -> String {
+    // In the worst case (every char requires a backslash), the output could
+    // be roughly twice the length of `input`.
+    let mut escaped = String::with_capacity(input.len() * 2);
+
+    for c in input.chars() {
+        match c {
+            '"'  => { escaped.push('\\'); escaped.push('"');  }
+            '\\' => { escaped.push('\\'); escaped.push('\\'); }
+            '\n' => { escaped.push('\\'); escaped.push('n');  }
+            '\r' => { escaped.push('\\'); escaped.push('r');  }
+            '\t' => { escaped.push('\\'); escaped.push('t');  }
+            '/'  => { escaped.push('\\'); escaped.push('/');  }
+            '\u{0008}' => { escaped.push('\\'); escaped.push('b'); }
+            '\u{000c}' => { escaped.push('\\'); escaped.push('f'); }
+            _ => escaped.push(c),
+        }
+    }
+
+    escaped
+}
+
+pub (crate) fn escape_single_quoted(input: &str) -> String {
+    let mut escaped = String::with_capacity(input.len() * 2);
+    for c in input.chars() {
+        match c {
+            '\''  => { escaped.push('\\'); escaped.push('"');  }
+            '\\' => { escaped.push('\\'); escaped.push('\\'); }
+            '\n' => { escaped.push('\\'); escaped.push('n');  }
+            '\r' => { escaped.push('\\'); escaped.push('r');  }
+            '\t' => { escaped.push('\\'); escaped.push('t');  }
+            '/'  => { escaped.push('\\'); escaped.push('/');  }
+            '\u{0008}' => { escaped.push('\\'); escaped.push('b'); }
+            '\u{000c}' => { escaped.push('\\'); escaped.push('f'); }
+            _ => escaped.push(c),
+        }
+    }
+    escaped
+}

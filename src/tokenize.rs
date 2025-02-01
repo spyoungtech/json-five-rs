@@ -1,10 +1,11 @@
 use std::fmt::{Display, Formatter};
+use std::io::Read;
 use std::iter::{Peekable};
 use std::str::{CharIndices};
 use crate::utils::get_line_col_char;
 
 #[derive(PartialEq, Clone, Debug)]
-pub(crate) enum TokType {
+pub enum TokType {
     LeftBrace,
     RightBrace,
     LeftBracket,
@@ -26,7 +27,7 @@ pub(crate) enum TokType {
     Nan,
     Exponent,
     Hexadecimal,
-    Octal,
+    // Octal,
     Plus,
     Minus,
     EOF,
@@ -40,9 +41,9 @@ pub(crate) type TokenSpan = (usize, TokType, usize);
 
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Tokens<'input> {
-    tok_spans: Vec<TokenSpan>,
-    pub (crate) source: &'input str
+pub struct Tokens<'input> {
+    pub tok_spans: Vec<TokenSpan>,
+    pub source: &'input str
 }
 
 
@@ -53,12 +54,12 @@ impl<'input> Tokens<'input> {
 }
 
 #[derive(Debug)]
-pub (crate) struct TokenizationError {
-    pub(crate) message: String,
-    pub(crate) index: usize, // byte offset
-    pub(crate) lineno: usize,
-    pub(crate) colno: usize,
-    pub(crate) char_index: usize // char offset
+pub struct TokenizationError {
+    pub message: String,
+    pub index: usize, // byte offset
+    pub lineno: usize,
+    pub colno: usize,
+    pub char_index: usize // char offset
 }
 
 impl<'input> Display for TokenizationError {
@@ -77,10 +78,10 @@ pub(crate) struct Tokenizer<'input> {
 
 
 const HEX_CHARS: &str = "0123456789abcdefABCDEF";
-const IDENTIFIER_SYMBOLS: &str = "$_";
-
+const IDENTIFIER_START_SYMBOLS: &str = "$_";
+const IDENTIFIER_PARTS: &str = "$_\u{200C}\u{200D}\u{005F}\u{203F}\u{2040}\u{2054}\u{FE33}\u{FE34}\u{FE4D}\u{FE4E}\u{FE4F}\u{FF3F}";
 #[derive(Debug)]
-struct TokenizerConfig {
+pub struct TokenizerConfig {
     pub include_whitespace: bool,
     pub include_comments: bool,
     pub allow_octal: bool,
@@ -88,7 +89,7 @@ struct TokenizerConfig {
 
 impl TokenizerConfig {
     pub fn new() -> Self {
-        TokenizerConfig {include_whitespace: true, include_comments: true, allow_octal: false}
+        TokenizerConfig {include_whitespace: false, include_comments: false, allow_octal: false}
     }
 }
 
@@ -169,7 +170,7 @@ impl <'input> Tokenizer<'input> {
     }
 
     fn process_octal(&mut self) -> Result<TokenSpan, TokenizationError> {
-        let (start_idx, start_char) = self.lookahead.expect("Unexpected end of input, was processing octal");
+        let (start_idx, _start_char) = self.lookahead.expect("Unexpected end of input, was processing octal");
         if self.configuration.allow_octal {
             todo!()
         } else {
@@ -339,10 +340,44 @@ impl <'input> Tokenizer<'input> {
     }
 
     fn process_identifier_or_const(&mut self) -> Result<TokenSpan, TokenizationError> {
-        let (start_idx, _start_char) = self.lookahead.expect("Unexpected end of input, was expecting identifier/const char");
+        let (start_idx, start_char) = self.lookahead.expect("Unexpected end of input, was expecting identifier/const char");
         let mut last_idx = start_idx;
-
-        // TODO: ensure that the first character is a valid identifier start character
+        use unicode_general_category::{get_general_category, GeneralCategory};
+        match start_char {
+            c if c.is_alphabetic() => {}
+            c if IDENTIFIER_START_SYMBOLS.contains(c) => {}
+            '\\' => {
+                match self.chars.peek() {
+                    None => {return Err(self.make_error("Unexpected EOF".to_string(), start_idx))}
+                    Some((_, c)) => {
+                        match c {
+                            'u' => {
+                                self.advance();
+                                for _ in 0..4 {
+                                    match self.advance() {
+                                        None => {
+                                            return Err(self.make_error("Invalid identifier start".to_string(), start_idx))
+                                        }
+                                        Some((idx, c)) => {
+                                            last_idx = idx;
+                                            if !HEX_CHARS.contains(c) {
+                                                return Err(self.make_error("Invalid identifier start".to_string(), start_idx))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            _ => {
+                                return Err(self.make_error("Invalid identifier start".to_string(), start_idx))
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {
+                return Err(self.make_error(format!("Invalid character {}", start_char), start_idx))
+            }
+        }
 
         loop {
             match self.chars.peek() {
@@ -354,13 +389,49 @@ impl <'input> Tokenizer<'input> {
                         last_idx = *next_idx;
                         self.advance();
                         continue
-                    } else if IDENTIFIER_SYMBOLS.contains(*next_char) {
+                    } else if IDENTIFIER_PARTS.contains(*next_char) {
                         last_idx = *next_idx;
                         self.advance();
                         continue
+                    } else if *next_char == '\\' {
+                        self.advance();
+                        match self.advance() {
+                            None => {return Err(self.make_error("Unexpected EOF".to_string(), start_idx))}
+                            Some((_, c)) => {
+                                match c {
+                                    'u' => {
+                                        for _ in 0..4 {
+                                            match self.advance() {
+                                                None => {
+                                                    return Err(self.make_error("Invalid unquoted key1".to_string(), start_idx))
+                                                }
+                                                Some((_, c)) => {
+                                                    if !HEX_CHARS.contains(c) {
+
+                                                        return Err(self.make_error("Invalid unquoted key2".to_string(), start_idx))
+                                                    }
+
+                                                }
+                                            }
+                                        }
+                                        last_idx = self.lookahead.unwrap().0
+                                    }
+                                    _ => {
+                                        return Err(self.make_error("Invalid unquoted key3".to_string(), start_idx))
+                                    }
+                                }
+                            }
+                        }
                     } else {
-                        break self.tok_from_indices(start_idx, last_idx + 1)
-                    } // TODO: handle unicode escape sequences
+                        match get_general_category(*next_char) {
+                            GeneralCategory::NonspacingMark | GeneralCategory::SpacingMark => {
+                                last_idx = *next_idx;
+                                self.advance();
+                                continue
+                            }
+                            _ => break self.tok_from_indices(start_idx, last_idx + 1)
+                        }
+                    }
                 }
             }
         }
@@ -397,10 +468,9 @@ impl <'input> Tokenizer<'input> {
                         None => {
                             return Err(self.make_error("Unexpected end of input while processing block comment".to_string(), start_idx))
                         }
-                        Some((peeked_idx, peeked_char)) => {
+                        Some((_peeked_idx, peeked_char)) => {
                             match peeked_char {
                                 '*' => {
-                                    last_idx = *peeked_idx;
                                     self.advance();
                                     let maybe_next_next = self.chars.peek();
                                     match maybe_next_next {
@@ -421,7 +491,6 @@ impl <'input> Tokenizer<'input> {
                                     }
                                 }
                                 _ => {
-                                    last_idx = *peeked_idx;
                                     self.advance();
                                     continue
                                 }
@@ -468,7 +537,14 @@ impl <'input> Tokenizer<'input> {
                     '/' => {
                         let (_, next_next) = self.chars.peek().unwrap_or(&(usize::MAX, '!'));
                         match next_next {
-                            '/' | '*' => self.process_comment(),
+                            '/' | '*' => {
+                                if self.configuration.include_comments {
+                                    self.process_comment()
+                                } else {
+                                    self.process_comment()?;
+                                    self.next_token()
+                                }
+                            },
                             _ => {
                                 return Err(self.make_error("unexpected token '/'".to_string(), next_idx))
                             }
@@ -495,9 +571,74 @@ impl <'input> Tokenizer<'input> {
     }
 }
 
-pub fn tokenize(text: &'_ str) -> Result<Tokens<'_>, TokenizationError> {
+impl<'input> Iterator for Tokenizer<'input> {
+    type Item = Result<TokenSpan, TokenizationError>;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.next_token() {
+            Ok(span) => {
+                match span.1 {
+                    TokType::EOF => {
+                        None
+                    }
+                    _ => Some(Ok(span))
+                }
+            }
+            Err(e) => {
+                Some(Err(e))
+            }
+        }
+    }
+}
+
+pub fn tokenize_str(text: &'_ str) -> Result<Tokens<'_>, TokenizationError> {
     Tokenizer::new(text).tokenize()
 }
+
+pub fn tokenize_rt_str(text: &'_ str) -> Result<Tokens<'_>, TokenizationError> {
+    let config = TokenizerConfig{include_comments: true, include_whitespace: true, allow_octal: false};
+    Tokenizer::with_configuration(text, config).tokenize()
+}
+
+fn tokenize_bytes(bytes: &'_ [u8]) -> Result<Tokens<'_>, TokenizationError> {
+    let maybe_text = std::str::from_utf8(bytes);
+    match maybe_text {
+        Ok(text) => {
+            Tokenizer::new(text).tokenize()
+        }
+        Err(e) => {
+            let valid_point = e.valid_up_to();
+            if valid_point > 0 {
+                let valid_text = std::str::from_utf8(&bytes[..valid_point]).unwrap();
+                let (lineno, colno, char_index) = get_line_col_char(valid_text, valid_point);
+                Err(TokenizationError{message: "Invalid UTF8 at".to_string(), lineno, colno, char_index, index: valid_point})
+            } else {
+                Err(TokenizationError{message: "Invalid UTF8 at".to_string(), lineno: 1, colno: 0, char_index: 0, index: 0})
+            }
+        }
+    }
+}
+
+fn tokenize_rt_bytes(bytes: &'_ [u8]) -> Result<Tokens<'_>, TokenizationError> {
+    let maybe_text = std::str::from_utf8(bytes);
+    match maybe_text {
+        Ok(text) => {
+            let config = TokenizerConfig{include_comments: true, include_whitespace: true, allow_octal: false};
+            Tokenizer::with_configuration(text, config).tokenize()
+        }
+        Err(e) => {
+            let valid_point = e.valid_up_to();
+            if valid_point > 0 {
+                let valid_text = std::str::from_utf8(&bytes[..valid_point]).unwrap();
+                let (lineno, colno, char_index) = get_line_col_char(valid_text, valid_point);
+                Err(TokenizationError{message: "Invalid UTF8 at".to_string(), lineno, colno, char_index, index: valid_point})
+            } else {
+                Err(TokenizationError{message: "Invalid UTF8 at".to_string(), lineno: 1, colno: 0, char_index: 0, index: 0})
+            }
+        }
+    }
+}
+
+
 
 #[cfg(test)]
 mod test {
@@ -506,7 +647,7 @@ mod test {
     #[test]
     fn test_foo() {
         let text = "";
-        let toks = tokenize(text).unwrap();
+        let toks = tokenize_str(text).unwrap();
         let expected = Tokens{ tok_spans: vec![(0, EOF, 0)], source: text};
         assert_eq!(toks, expected);
     }
@@ -514,7 +655,7 @@ mod test {
     #[test]
     fn test_heck() {
         let text = "{}";
-        let toks = tokenize(text).unwrap();
+        let toks = tokenize_str(text).unwrap();
         let expected = Tokens{ tok_spans: vec![(0, LeftBrace, 1), (1, RightBrace, 2), (2, EOF, 2)], source: text};
         assert_eq!(toks, expected);
     }
@@ -522,15 +663,23 @@ mod test {
     #[test]
     fn test_heck2() {
         let text = "{\"foo\":\"bar\"}";
-        let toks = tokenize(text).unwrap();
+        let toks = tokenize_str(text).unwrap();
+        let expected = Tokens{ tok_spans: vec![(0, LeftBrace, 1), (1, DoubleQuotedString, 6), (6, Colon, 7), (7, DoubleQuotedString, 12), (12, RightBrace, 13), (13, EOF, 13)], source: text};
+        assert_eq!(toks, expected)
+    }
+    #[test]
+    fn test_heck3() {
+        let text = "{\"foo\":\"bar\"}";
+        let toks = tokenize_rt_str(text).unwrap();
         let expected = Tokens{ tok_spans: vec![(0, LeftBrace, 1), (1, DoubleQuotedString, 6), (6, Colon, 7), (7, DoubleQuotedString, 12), (12, RightBrace, 13), (13, EOF, 13)], source: text};
         assert_eq!(toks, expected)
     }
 
+
     #[test]
     fn test_single_quoted_string() {
         let text = "{'foo':'bar'}";
-        let toks = tokenize(text).unwrap();
+        let toks = tokenize_str(text).unwrap();
         let expected = Tokens{ tok_spans: vec![(0, LeftBrace, 1), (1, SingleQuotedString, 6), (6, Colon, 7), (7, SingleQuotedString, 12), (12, RightBrace, 13), (13, EOF, 13)], source: text};
         assert_eq!(toks, expected);
     }
@@ -538,7 +687,7 @@ mod test {
     #[test]
     fn test_array() {
         let text = "[1,2,3]";
-        let toks = tokenize(text).unwrap();
+        let toks = tokenize_str(text).unwrap();
         let expected = Tokens{ tok_spans: vec![(0, LeftBracket, 1), (1, Integer, 2), (2, Comma, 3), (3, Integer, 4), (4, Comma, 5), (5, Integer, 6), (6, RightBracket, 7), (7, EOF, 7)], source: text};
         assert_eq!(toks, expected);
     }
@@ -546,7 +695,7 @@ mod test {
     #[test]
     fn test_float_number() {
         let text = "[1.23,4.56]";
-        let toks = tokenize(text).unwrap();
+        let toks = tokenize_str(text).unwrap();
         let expected = Tokens{ tok_spans: vec![(0, LeftBracket, 1), (1, Float, 5), (5, Comma, 6), (6, Float, 10), (10, RightBracket, 11), (11, EOF, 11)], source: text};
         assert_eq!(toks, expected);
     }
@@ -554,7 +703,7 @@ mod test {
     #[test]
     fn test_exponent_number() {
         let text = "[1e10,2e-5]";
-        let toks = tokenize(text).unwrap();
+        let toks = tokenize_str(text).unwrap();
         let expected = Tokens{ tok_spans: vec![(0, LeftBracket, 1), (1, Exponent, 5), (5, Comma, 6), (6, Exponent, 10), (10, RightBracket, 11), (11, EOF, 11)], source: text};
         assert_eq!(toks, expected);
     }
@@ -562,15 +711,15 @@ mod test {
     #[test]
     fn test_whitespace() {
         let text = " {\n\t} ";
-        let toks = tokenize(text).unwrap();
-        let expected = Tokens{ tok_spans: vec![(1, LeftBrace, 2), (4, RightBrace, 5), (6, EOF, 6)], source: text};
+        let toks = Tokenizer::with_configuration(text, TokenizerConfig{include_whitespace: true, include_comments: true, allow_octal: false}).tokenize().unwrap();
+        let expected = Tokens{ tok_spans: vec![(0, Whitespace, 1), (1, LeftBrace, 2), (2, Whitespace, 4), (4, RightBrace, 5), (5, Whitespace, 6), (6, EOF, 6)], source: text};
         assert_eq!(toks, expected);
     }
 
     #[test]
     fn test_true_false_null() {
         let text = "[true,false,null]";
-        let toks = tokenize(text).unwrap();
+        let toks = tokenize_str(text).unwrap();
         let expected = Tokens{source: text, tok_spans: vec![(0, LeftBracket, 1), (1, True, 5), (5, Comma, 6), (6, False, 11), (11, Comma, 12), (12, Null, 16), (16, RightBracket, 17), (17, EOF, 17)]};
         assert_eq!(toks, expected);
         }
@@ -578,9 +727,23 @@ mod test {
     #[test]
     fn test_number() {
         let text = "123";
-        let toks = tokenize(text).unwrap();
+        let toks = tokenize_str(text).unwrap();
         let expected = Tokens{source: text, tok_spans: vec![(0, Integer, 3), (3, EOF, 3)]};
         assert_eq!(toks, expected);
 
+    }
+
+    #[test]
+    fn test_unexpected_symbol() {
+        let text = "1!2";
+        let e = tokenize_str(text).unwrap_err();
+    }
+
+    #[test]
+    fn test_special_things() {
+        let text = r#"{$_:1,_$:2,a\u200C:3}"#;
+        let toks = tokenize_str(text).unwrap();
+        let expected = Tokens{source: text, tok_spans: vec![(0, LeftBrace, 1), (1, Name, 3), (3, Colon, 4), (4, Integer, 5), (5, Comma, 6), (6, Name, 8), (8, Colon, 9), (9, Integer, 10), (10, Comma, 11), (11, Name, 18), (18, Colon, 19), (19, Integer, 20), (20, RightBrace, 21), (21, EOF, 21)]};
+        assert_eq!(toks, expected)
     }
 }
