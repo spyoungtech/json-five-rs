@@ -2,17 +2,15 @@
 
 This project provides a handwritten JSON5 tokenizer and recursive descent parser compatible with `serde`.
 
-Besides being a reasonably performant parser, this project also aims to provide support for round-trip use cases 
-(e.g., formatters, linters) where whitespace and comments need to be preserved, added/removed, or otherwise manipulated.
+# Key Features
 
-The default parser and AST model implementation are intended for deserialization and serialization use cases and 
-attempts to be as lightweight as possible. As such, the tokenizer, parser, and AST model are all tied to the 
-lifetime of your input document in order to avoid unnecessary copies.
-
-An alternative parser and tokenizer is available in the `rt` module. These are intended for round-trip use cases and 
-favor ergonomics over performance. The AST model consists wholly of owned types. The tokenizer produces owned tokens 
-containing lexeme of each token.
-
+- Compatible with `serde` data model
+- Supports round-trip use cases with preservation/editing of whitespace and comments
+- Supports formatting (indent, compact formats, etc.) in serialization
+- Supports both model-based (AST) edits and token-based round-tripping
+- Performance-focused default tokenizer/parser that avoids copying input
+- Ergonomics-focused round-trip tokenizer/parser that produce structures with solely owned types for ease of editing
+- Supports basic parsing and serialization without `serde` (you may disable the default `serde` feature!)
 
 # Usage
 
