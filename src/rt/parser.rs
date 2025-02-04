@@ -1,47 +1,83 @@
 use std::fmt::{Display, Formatter};
 use std::iter::Peekable;
 use std::slice::Iter;
-use crate::tokenize::{TokenSpan, TokType};
-use crate::tokenize::Tokens;
-use crate::tokenize::TokType::{Colon, Comma, RightBrace};
+use std::vec::IntoIter;
 use crate::utils::get_line_col_char;
-
-
-#[derive(PartialEq, Debug)]
-pub struct JSONKeyValuePair<'input> {
-    pub(crate) key: JSONValue<'input>,
-    pub(crate) value: JSONValue<'input>,
-}
-
-
+use crate::rt::tokenize::{Token, SourceTokens, TokenContext};
+use crate::tokenize::{TokType, TokenSpan, Tokens};
+use crate::tokenize::TokType::*;
 #[derive(PartialEq, Debug)]
 pub enum UnaryOperator {
     Plus,
     Minus,
 }
 
+type Ws = Vec<Token>;
 
+// {wsc.0} value {wsc.1}
 #[derive(PartialEq, Debug)]
-pub enum JSONValue<'input> {
-    JSONObject { key_value_pairs: Vec<JSONKeyValuePair<'input>> },
-    JSONArray { values: Vec<JSONValue<'input>> },
-    Integer(&'input str),
-    Float(&'input str),
-    Exponent(&'input str),
-    Null,
-    Infinity,
-    NaN,
-    Hexadecimal(&'input str),
-    Bool(bool),
-    DoubleQuotedString(&'input str),
-    SingleQuotedString(&'input str),
-    Unary { operator: UnaryOperator, value: Box<JSONValue<'input>> },
-    Identifier(&'input str), // XXX: for keys only!
+struct JSONTextContext {
+    wsc: (String, String)
+}
+
+// LBRACE {wsc} [ key_value_pairs ] RBRACE
+//                                  ^ any whitespace that would go here would be part of the KVP
+#[derive(PartialEq, Debug)]
+struct JSONObjectContext {
+    wsc: (String,)
+
+}
+
+
+// key {wsc.0} COLON {wsc.1} value {wsc.2} [ COMMA {wsc.3} ] [ next_kvp ]
+#[derive(PartialEq, Debug)]
+struct KeyValuePairContext {
+    wsc: (String, String, String, Option<String>),
+    //                            ^ Some() here represents the presence of a comma and its subsequent whitespace  
+}
+
+// LBRACKET {wsc} [ array_values ] RBRACKET
+#[derive(PartialEq, Debug)]
+struct JSONArrayContext {
+    wsc: (String,)
+}
+
+// value {wsc.0} [ COMMA {wsc.1} ] [ next_value ]
+#[derive(PartialEq, Debug)]
+struct ArrayValueContext {
+    wsc: (String, Option<String>),
+    //            ^ Some() here represents the presence of a comma and its subsequent whitespace  
 }
 
 #[derive(PartialEq, Debug)]
-pub struct JSONText<'input> {
-    pub(crate) value: JSONValue<'input>,
+pub struct JSONKeyValuePair {
+    pub(crate) key: JSONValue,
+    pub(crate) value: JSONValue,
+    pub context: Option<KeyValuePairContext>
+}
+
+
+#[derive(PartialEq, Debug)]
+pub enum JSONValue {
+    JSONObject { key_value_pairs: Vec<JSONKeyValuePair> },
+    JSONArray { values: Vec<JSONValue> },
+    Integer(String),
+    Float(String),
+    Exponent(String),
+    Null,
+    Infinity,
+    NaN,
+    Hexadecimal(String),
+    Bool(bool),
+    DoubleQuotedString(String),
+    SingleQuotedString(String),
+    Unary { operator: UnaryOperator, value: Box<JSONValue> },
+    Identifier(String), // XXX: for keys only!
+}
+
+#[derive(PartialEq, Debug)]
+pub struct JSONText {
+    pub(crate) value: JSONValue,
 }
 #[allow(dead_code)]
 pub enum TrailingComma {
@@ -75,17 +111,16 @@ impl StyleConfiguration {
 
     pub fn default() -> Self {
         StyleConfiguration{indent: None, item_separator: ", ".to_string(), key_separator: ": ".to_string(), current_indent: 0, trailing_comma: TrailingComma::NONE}
-
     }
 }
 
-impl<'input> JSONKeyValuePair<'input> {
+impl JSONKeyValuePair {
     fn to_string_styled(&self, style: &mut StyleConfiguration) -> String {
         format!("{}{}{}", self.key.to_string_styled(style), style.key_separator, self.value)
     }
 }
 
-impl<'input> JSONValue<'input> {
+impl JSONValue {
     fn to_string_styled(&self, style: &mut StyleConfiguration) -> String {
         match self {
             JSONValue::Identifier(s) | JSONValue::Integer(s) | JSONValue::Float(s) | JSONValue::Exponent(s) | JSONValue::Hexadecimal(s) => {
@@ -202,7 +237,7 @@ impl<'input> JSONValue<'input> {
 }
 
 
-impl<'input> Display for JSONValue<'input> {
+impl Display for JSONValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut style = StyleConfiguration::default();
         let res = self.to_string_styled(&mut style);
@@ -211,7 +246,7 @@ impl<'input> Display for JSONValue<'input> {
 }
 
 
-impl<'input> Display for JSONText<'input> {
+impl Display for JSONText {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.value.to_string_styled(&mut StyleConfiguration::default()))
     }
@@ -236,32 +271,37 @@ impl Display for ParsingError {
     }
 }
 
-struct JSON5Parser<'toks, 'input> {
+
+pub struct JSON5Parser<'toks, 'input> {
     source: &'input str,
-    source_tokens: Peekable<Iter<'toks, TokenSpan>>,
-    lookahead: Option<&'toks TokenSpan>,
+    source_tokens: Peekable<Iter<'toks, Token>>,
+    lookahead: Option<&'toks Token>,
 }
 
 
 impl<'toks, 'input> JSON5Parser<'toks, 'input> {
-    fn new(tokens: &'toks Tokens<'input>) -> Self {
-        JSON5Parser { source_tokens: tokens.tok_spans.iter().peekable(), lookahead: None, source: tokens.source }
+    fn new(source: &str, source_tokens: Peekable<Iter<'toks, Token>>) -> Self {
+        JSON5Parser { source, source_tokens, lookahead: None }
     }
 
-    fn advance(&mut self) -> Option<&'toks TokenSpan> {
+    fn from_tokens(tokens: &SourceTokens) -> Self {
+
+    }
+
+    fn advance(&mut self) -> Option<&Token> {
         match self.source_tokens.next() {
             None => {
                 self.lookahead = None;
                 None
             }
-            Some(span) => {
-                match span.1 {
+            Some(tok) => {
+                match tok.tok_type {
                     TokType::BlockComment | TokType::LineComment | TokType::Whitespace => {
                         return self.advance()
                     }
                     _ => {
 
-                        self.lookahead = Some(span);
+                        self.lookahead = Some(tok);
                         self.lookahead
                     }
                 }
@@ -270,22 +310,22 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
     }
 
     #[inline]
-    fn get_tok_source(&self, span: &'toks TokenSpan) -> &'input str {
-        &self.source[span.0 .. span.2]
+    fn get_tok_source(&self, tok: &Token) -> &str {
+        tok.lexeme.as_str()
     }
 
 
-    fn peek(&mut self) -> Option<&'toks TokenSpan> {
+    fn peek(&mut self) -> Option<&'toks Token> {
         match self.source_tokens.peek() {
             None => None,
-            Some(span) => {
-                match span.1 {
+            Some(tok) => {
+                match tok.tok_type {
                     TokType::BlockComment | TokType::LineComment | TokType::Whitespace => {
                         self.source_tokens.next();
                         self.peek()
                     }
                     _ => {
-                        Some(span)
+                        Some(tok)
                     }
                 }
             }
@@ -293,19 +333,54 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
     }
 
 
-    fn position(&mut self) -> usize {
+    fn position(&mut self) -> Option<usize> {
         match self.peek() {
             None => {
                 match self.lookahead {
-                    None => 0, // XXX: ???? might be end, actually?
-                    Some(span) => {span.2}
+                    None => Some(0), // XXX: ???? might be end, actually?
+                    Some(tok) => {
+                        match &tok.context {
+                            None => None,
+                            Some(ctx) => {
+                                Some(ctx.start_byte_offset)
+                            }
+                        }
+                    }
                 }
             }
-            Some(span) => {
-                span.0
+            Some(tok) => {
+                match &tok.context {
+                    None => None,
+                    Some(ctx) => {
+                        Some(ctx.start_byte_offset)
+                    }
+                }
             }
         }
     }
+
+    fn make_error_no_index(&self, message: String) -> ParsingError {
+        ParsingError {
+            message,
+            context: None
+        }
+    }
+
+    fn make_error_token_start(&self, message: String, tok: &Token) -> ParsingError {
+        match &tok.context {
+            Some(ctx) => {
+                let err_context = ErrorContext{lineno: ctx.start_lineno, colno: ctx.start_colno, index: ctx.start_byte_offset, char_index: ctx.start_char_index};
+                ParsingError{message, context: Some(err_context)}
+            },
+            None => {
+                ParsingError{
+                    message,
+                    context: None
+                }
+            }
+        }
+    }
+
 
     fn make_error(&self, message: String, index: usize) -> ParsingError {
         let (lineno, colno, char_index) = get_line_col_char(self.source, index);
@@ -318,24 +393,24 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
         }
     }
 
-    fn check_and_consume(&mut self, types: Vec<TokType>) -> Option<&'toks TokenSpan> {
+    fn check_and_consume(&mut self, types: Vec<TokType>) -> Option<&'toks Token> {
         let next_tok = self.peek()?;
         for toktype in types {
-            if next_tok.1 == toktype {
+            if next_tok.tok_type == toktype {
                 return self.advance();
             }
         }
         None
     }
 
-    #[inline]
-    fn check_and_consume_with_source(&mut self, types: Vec<TokType>) -> Option<(&'toks TokenSpan, &'input str)> {
-        let tok = self.check_and_consume(types)?;
-        let source = self.get_tok_source(tok);
-        Some((tok, source))
-    }
+    // #[inline]
+    // fn check_and_consume_with_source(&mut self, types: Vec<TokType>) -> Option<(&'toks TokenSpan, &'input str)> {
+    //     let tok = self.check_and_consume(types)?;
+    //     let source = self.get_tok_source(tok);
+    //     Some((tok, source))
+    // }
 
-    fn parse_key(&mut self) -> Result<JSONValue<'input>, ParsingError>{
+    fn parse_key(&mut self) -> Result<JSONValue, ParsingError>{
         // This is a terminal point
         // We either get a valid key or we bail.
         match self.check_and_consume_with_source(vec![TokType::Name, TokType::DoubleQuotedString, TokType::SingleQuotedString]) {
@@ -368,7 +443,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
         }
     }
 
-    fn parse_object(&mut self) -> Result<JSONValue<'input>, ParsingError> {
+    fn parse_object(&mut self) -> Result<JSONValue, ParsingError> {
         let mut kvps: Vec<JSONKeyValuePair> = Vec::new();
         loop {
             match self.check_and_consume(vec![RightBrace]) {
@@ -377,8 +452,12 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                     match self.check_and_consume(vec![Colon]) {
 
                         None => {
-                            let idx = self.position();
-                            return Err(self.make_error("Expecting ':' delimiter".to_string(), idx))
+                            match self.position() {
+                                Some(idx) => {
+                                    return Err(self.make_error("Expecting ':' delimiter".to_string(), idx))
+                                }
+                            }
+
                         }
                         Some(_) => {
                             let val = self.parse_value()?;
@@ -411,7 +490,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
         }
     }
 
-    fn parse_array(&mut self) -> Result<JSONValue<'input>, ParsingError> {
+    fn parse_array(&mut self) -> Result<JSONValue, ParsingError> {
         let mut values:Vec<JSONValue> = Vec::new();
         loop {
             match self.check_and_consume(vec![TokType::RightBracket]) {
@@ -442,18 +521,18 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
         }
     }
 
-    fn parse_primary(&mut self) -> Result<JSONValue<'input>, ParsingError> {
-        let span = self.advance().unwrap();
-        match &span.1 {
-            TokType::Integer => {Ok(JSONValue::Integer(self.get_tok_source(span)))}
-            TokType::Float => {Ok(JSONValue::Float(self.get_tok_source(span)))}
-            TokType::Exponent => { Ok(JSONValue::Exponent(self.get_tok_source(span)))}
+    fn parse_primary(&mut self) -> Result<JSONValue, ParsingError> {
+        let tok  = self.advance().unwrap();
+        match &tok.tok_type {
+            TokType::Integer => {Ok(JSONValue::Integer(tok.lexeme))}
+            TokType::Float => {Ok(JSONValue::Float(tok.lexeme))}
+            TokType::Exponent => { Ok(JSONValue::Exponent(tok.lexeme))}
             TokType::SingleQuotedString => {
-                let lexeme = self.get_tok_source(span);
+                let lexeme = tok.lexeme;
                 Ok(JSONValue::SingleQuotedString(&lexeme[1..lexeme.len() - 1]))
             },
             TokType::DoubleQuotedString => {
-                let lexeme = self.get_tok_source(span);
+                let lexeme = tok.lexeme;
                 Ok(JSONValue::DoubleQuotedString(&lexeme[1..lexeme.len() - 1]))
             },
             TokType::True => Ok(JSONValue::Bool(true)),
@@ -461,18 +540,15 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
             TokType::Null => Ok(JSONValue::Null),
             TokType::Infinity => Ok(JSONValue::Infinity),
             TokType::Nan => Ok(JSONValue::NaN),
-            TokType::Hexadecimal => Ok(JSONValue::Hexadecimal(self.get_tok_source(span))),
+            TokType::Hexadecimal => Ok(JSONValue::Hexadecimal(tok.lexeme)),
             TokType::EOF => {
-                match self.position() {
-                    0 => Err(self.make_error("Unexpected EOF. Was expecting value.".to_string(), 0)),
-                    pos => Err(self.make_error("Unexpected EOF".to_string(), pos-1))
-                }
+                Err(self.make_error_token_start("Unexpected EOF".to_string(), tok))
             },
-            t => Err(self.make_error(format!("Unexpected token of type {:?}: {:?}", t, self.get_tok_source(span)), span.0))
+            t => Err(self.make_error_token_start(format!("Unexpected token of type {:?}: {:?}", t, tok.lexeme), tok))
         }
     }
 
-    fn parse_unary(&mut self) -> Result<JSONValue<'input>, ParsingError> {
+    fn parse_unary(&mut self) -> Result<JSONValue, ParsingError> {
         match self.check_and_consume(vec![TokType::Plus, TokType::Minus]) {
             None => self.parse_primary(),
             Some(span) => {
@@ -491,7 +567,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
         }
     }
 
-    fn parse_obj_or_array(&mut self) -> Result<JSONValue<'input>, ParsingError> {
+    fn parse_obj_or_array(&mut self) -> Result<JSONValue, ParsingError> {
         match self.check_and_consume(vec![TokType::LeftBracket, TokType::LeftBrace]) {
             None => self.parse_unary(),
             Some(span) => {
@@ -505,11 +581,11 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
     }
 
 
-    fn parse_value(&mut self) -> Result<JSONValue<'input>, ParsingError> {
+    fn parse_value(&mut self) -> Result<JSONValue, ParsingError> {
         self.parse_obj_or_array()
     }
 
-    fn parse_text(&mut self) -> Result<JSONText<'input>, ParsingError> {
+    fn parse_text(&mut self) -> Result<JSONText, ParsingError> {
         let value = self.parse_value()?;
         match self.advance() {
             None => {}
@@ -523,12 +599,12 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
     }
 }
 
-pub fn from_tokens<'toks, 'input>(tokens: &'toks Tokens<'input>) -> Result<JSONText<'input>, ParsingError> {
+pub fn from_tokens(tokens: &SourceTokens) -> Result<JSONText, ParsingError> {
     let mut parser = JSON5Parser::new(tokens);
     parser.parse_text()
 }
 
-pub fn from_str<'input>(source: &'input str) -> Result<JSONText<'input>, ParsingError> {
+pub fn from_str(source: &str) -> Result<JSONText, ParsingError> {
     use crate::tokenize::tokenize_str;
     let maybe_toks = tokenize_str(source);
     match maybe_toks {

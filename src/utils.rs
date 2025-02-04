@@ -67,3 +67,4 @@ pub (crate) fn escape_single_quoted(input: &str) -> String {
     }
     escaped
 }
+
