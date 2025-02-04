@@ -43,7 +43,7 @@ fn main() {
 ```
 
 
-## Round-trip model
+# Round-trip model
 
 The `rt` module contains the round-trip parser. This is intended to be ergonomic for round-trip use cases, although 
 it is still very possible to use the default parser (which is more performance-oriented) for certain round-trip use cases. 
@@ -61,7 +61,7 @@ The `context` field is always an `Option`.
 
 Contexts are associated with the following structs (which correspond to the JSON5 productions) and their context layout:
 
-### `rt::parser::JSONText`
+## `rt::parser::JSONText`
 
 Represents the top-level Text production of a JSON5 document. It consists solely of a single (required) value. 
 It may have whitespace/comments before or after the value. The `value` field contains any `JSONValue` and the `context` 
@@ -76,7 +76,7 @@ doc.context.wsc.1 // any whitespace or comments after the value
 ```
 
 
-### `rt::parser::JSONValue::JSONObject`
+## `rt::parser::JSONValue::JSONObject`
 
 Member of the `rt::parser::JSONValue` enum representing [JSON5 objects](https://spec.json5.org/#objects).
 
@@ -86,7 +86,7 @@ the whitespace that precedes the closing brace is part of the last item in the `
 In other words: `LBRACE { wsc.0 } [ key_value_pairs ] RBRACE`  
 and: `.context.wsc: (String,)`
 
-#### `rt::parser::KeyValuePair`
+### `rt::parser::KeyValuePair`
 
 The `KeyValuePair` struct represents the ['JSON5Member' production](https://spec.json5.org/#prod-JSON5Member). 
 It has three fields: `key`, `value`, and `context`. The `key` is a `JSONValue`, in practice limited to `JSONValue::Identifier`, 
@@ -101,7 +101,7 @@ and: `.context.wsc: (String, String, String, Option<String>)`
 When `context.wsc.3` is `Some()`, it indicates the presence of a trailing comma (not included in the string) and 
 whitespace that follows the comma. This item MUST be `Some()` when it is not the last member in the object.
 
-### `rt::parser::JSONValue::JSONArray`
+## `rt::parser::JSONValue::JSONArray`
 
 Member of the `rt::parser::JSONValue` enum representing [JSON5 arrays](https://spec.json5.org/#arrays).
 
@@ -112,7 +112,7 @@ In other words: `LBRACKET { wsc.0 } [ values ] RBRACKET`
 and: `.context.wsc: (String,)`
 
 
-#### `rt::parser::JSONArrayValue`
+### `rt::parser::JSONArrayValue`
 
 The `JSONArrayValue` struct represents a single member of a JSON5 Array. It has two fields: `value`, which is any 
 `JSONValue`, and `context` which contains the contextual whitespace/comments around the member. The `context`'s `wsc` 
@@ -123,7 +123,7 @@ and: `.context.wsc: (String, Option<String>)`
 When `context.wsc.1` is `Some()` it indicates the presence of the comma (not included in the string) and any whitespace 
 following the comma is contained in the string. This item MUST be `Some()` when it is not the last member of the array.
 
-### Other `rt::parser::JSONValue`s
+## Other `rt::parser::JSONValue`s
 
 
 
@@ -144,7 +144,7 @@ Where these enum members have `String`s, they represent the object as it was tok
 is, for example, without any escape sequences un-escaped). The single- and double-quoted `String`s do not include the surrounding 
 quote characters. These members alone have no `context`.
 
-## round-trip tokenizer
+# round-trip tokenizer
 
 The `rt::tokenizer` module contains some useful tools for round-tripping tokens. The `Token`s produced by the 
 rt tokenizer are owned types containing the lexeme from the source. There are two key functions in the tokenizer module:
@@ -185,7 +185,7 @@ The `tok_type` attribute leverages the same `json_five::tokenize::TokType` types
 
 Note: string tokens will include surrounding quotes.
 
-## Examples
+# Examples
 
 See the `examples/` directory for examples of programs that utilize round-tripping features.
 
@@ -222,6 +222,8 @@ Some things I need to implement and some things I may or may not implement. In r
 - [ ] Complete logic for serialization of values (specifically: processing all \[unicode\] escape sequences in strings/identifiers and handling certain float formats like `.0` and `1.`)
 - [ ] Come up with a way to reject invalid unicode escape sequences (e.g., when an escape is used at the start of an identifier)
 - [ ] Validate correctness of the tokenizer (specifically: use of `is_alphabetic` may not comport with the JSON5 spec)
+- [ ] Publish crate
+- [ ] Move documentation from readme to crate documentation
 - [ ] Provide methods for safely editing models (e.g., validate that, when serialized, the model will produce a valid JSON5 document) today. This may also let us adjust the visibility of certain attributes.
 - [ ] Benchmarks
 - [ ] Optimize the round-trip tokenizer to avoid processing the input twice
