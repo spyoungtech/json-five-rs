@@ -1,0 +1,8 @@
+[package]
+name = "json5-doublequote-fixer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+json-five = { path="../../" }
+regex = { version="1.11.1" }
