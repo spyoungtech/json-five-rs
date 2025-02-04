@@ -219,7 +219,7 @@ parsing and serialization, including the ability to customize the style.
 Some things I need to implement and some things I may or may not implement. In rough priority order:
 
 - [ ] Complete logic for serialization of values (specifically: processing all \[unicode\] escape sequences in strings/identifiers and handling certain float formats like `.0` and `1.`)
-- [ ] Come up with a way to reject invalid unicode escape sequences (e.g., when an escape is used at the start of an identifier)
+- [ ] Come up with a way to reject invalid unicode escape sequences (e.g., when an illegal escape sequence is used at the start of an identifier)
 - [ ] Validate correctness of the tokenizer (specifically: use of `is_alphabetic` may not comport with the JSON5 spec)
 - [ ] Publish crate
 - [ ] Move documentation from readme to crate documentation
