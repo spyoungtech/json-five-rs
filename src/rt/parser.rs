@@ -64,7 +64,7 @@ pub struct JSONKeyValuePair {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub struct ArrayValue {
+pub struct JSONArrayValue {
     pub value: JSONValue,
     pub context: Option<ArrayValueContext>
 }
@@ -73,7 +73,7 @@ pub struct ArrayValue {
 #[derive(PartialEq, Debug, Clone)]
 pub enum JSONValue {
     JSONObject { key_value_pairs: Vec<JSONKeyValuePair>, context: Option<JSONObjectContext> },
-    JSONArray { values: Vec<ArrayValue>, context: Option<JSONArrayContext> },
+    JSONArray { values: Vec<JSONArrayValue>, context: Option<JSONArrayContext> },
     Integer(String),
     Float(String),
     Exponent(String),
@@ -171,7 +171,7 @@ impl JSONText {
 }
 
 // value {wsc.0} [ COMMA {wsc.1} ] [ next_value ]
-impl ArrayValue {
+impl JSONArrayValue {
     fn to_string(&self) -> String {
         match &self.context {
             None => {
@@ -486,7 +486,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
 
     fn parse_array(&mut self) -> Result<JSONValue, ParsingError> {
         use crate::tokenize::TokType::*;
-        let mut values:Vec<ArrayValue> = Vec::new();
+        let mut values:Vec<JSONArrayValue> = Vec::new();
         let leading_wsc = self.consume_whitespace_and_comments();
         loop {
             match self.check_and_consume(vec![TokType::RightBracket]) {
@@ -496,7 +496,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                     match self.check_and_consume(vec![Comma]) {
                         None => {
                             let array_val_context = ArrayValueContext{wsc: (self.collect_wsc_vec_to_string(&wsc_0), None)};
-                            let array_val = ArrayValue{value: val, context: Some(array_val_context)};
+                            let array_val = JSONArrayValue {value: val, context: Some(array_val_context)};
                             values.push(array_val);
                             match self.check_and_consume(vec![TokType::RightBracket]) {
                                 None => {
@@ -511,7 +511,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                         Some(_) => {
                             let wsc_1 = self.consume_whitespace_and_comments();
                             let array_val_context = ArrayValueContext{wsc: (self.collect_wsc_vec_to_string(&wsc_0), Some(self.collect_wsc_vec_to_string(&wsc_1)))};
-                            let array_val = ArrayValue{value: val, context: Some(array_val_context)};
+                            let array_val = JSONArrayValue {value: val, context: Some(array_val_context)};
                             values.push(array_val);
                             continue
                         }
