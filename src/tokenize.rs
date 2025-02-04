@@ -42,8 +42,13 @@ pub(crate) type TokenSpan = (usize, TokType, usize);
 #[derive(Debug, PartialEq)]
 pub struct Tokens<'input> {
     pub tok_spans: Vec<TokenSpan>,
-    pub source: &'input str
+    pub(crate) source: &'input str
 }
+
+use crate::rt::tokenize::Token;
+
+
+
 
 
 impl<'input> Tokens<'input> {
@@ -441,16 +446,17 @@ impl <'input> Tokenizer<'input> {
         let (mut last_idx, star_or_slash) = self.advance().expect("Expected second comment char");
         match star_or_slash {
             '/' => {
+                // line comment
                 loop {
                     match self.chars.peek() {
                         None => {
-                            return Ok((start_idx, TokType::LineComment, last_idx))
+                            return Ok((start_idx, TokType::LineComment, last_idx+1))
                         },
                         Some((peeked_idx, peeked_char)) => {
                             match peeked_char {
                                 '\n' | '\r' | '\u{2028}' | '\u{2029}' => {
                                     (last_idx, _) = self.advance().unwrap();
-                                    return Ok((start_idx, TokType::LineComment, last_idx))
+                                    return Ok((start_idx, TokType::LineComment, last_idx+1))
                                 }
                                 _ => {
                                     last_idx = *peeked_idx;
@@ -462,6 +468,7 @@ impl <'input> Tokenizer<'input> {
                 }
             },
             '*' => {
+                // block comment
                 loop {
                     match self.chars.peek() {
                         None => {
