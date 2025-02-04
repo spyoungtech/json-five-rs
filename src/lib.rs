@@ -16,7 +16,7 @@ pub use parser::from_str as model_from_str;
 pub use parser::from_tokens as model_from_tokens;
 pub use tokenize::{tokenize_bytes, tokenize_str};
 
-mod rt {
-    mod parser;
-    mod tokenize;
+pub mod rt {
+    pub mod parser;
+    pub mod tokenize;
 }

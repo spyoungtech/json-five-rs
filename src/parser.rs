@@ -7,6 +7,7 @@ use crate::tokenize::TokType::{Colon, Comma, RightBrace};
 use crate::utils::get_line_col_char;
 
 
+
 #[derive(PartialEq, Debug)]
 pub struct JSONKeyValuePair<'input> {
     pub(crate) key: JSONValue<'input>,
@@ -43,6 +44,7 @@ pub enum JSONValue<'input> {
 pub struct JSONText<'input> {
     pub(crate) value: JSONValue<'input>,
 }
+
 #[allow(dead_code)]
 pub enum TrailingComma {
     ALL,
