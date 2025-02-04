@@ -41,6 +41,12 @@ fn main() {
     // Parsed data: MyData { name: "Hello", count: 42, maybe: Some(NaN) }
 }
 ```
+## Examples
+
+See the `examples/` directory for examples of programs that utilize round-tripping features.
+
+- `examples/json5-doublequote-fixer` gives an example of tokenization-based round-tripping edits
+- `examples/json5-trailing-comma-formatter` gives an example of model-based round-tripping edits
 
 
 # Round-trip model
@@ -184,13 +190,6 @@ The `tok_type` attribute leverages the same `json_five::tokenize::TokType` types
 - `EOF`
 
 Note: string tokens will include surrounding quotes.
-
-# Examples
-
-See the `examples/` directory for examples of programs that utilize round-tripping features.
-
-- `examples/json5-doublequote-fixer` gives an example of tokenization-based round-tripping edits
-- `examples/json5-trailing-comma-formatter` gives an example of model-based round-tripping edits
 
 
 # Notes
