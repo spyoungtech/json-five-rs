@@ -537,7 +537,14 @@ impl <'input> Tokenizer<'input> {
                     '-' => Ok((next_idx, TokType:: Minus, next_idx + 1)),
                     '\'' | '"' => self.process_string(),
                     '.' => self.process_number(),
-                    c if c.is_ascii_digit() => self.process_number(),
+                    '\u{FEFF}' => {
+                        let whitespace_tok = self.process_whitespace()?;
+                        if self.configuration.include_whitespace {
+                            Ok(whitespace_tok)
+                        } else {
+                            self.next_token()
+                        }
+                    }
                     c if c.is_whitespace() => {
                         let whitespace_tok = self.process_whitespace()?;
                         if self.configuration.include_whitespace {
@@ -546,6 +553,7 @@ impl <'input> Tokenizer<'input> {
                             self.next_token()
                         }
                     },
+                    c if c.is_ascii_digit() => self.process_number(),
                     '/' => {
                         let (_, next_next) = self.chars.peek().unwrap_or(&(usize::MAX, '!'));
                         match next_next {
