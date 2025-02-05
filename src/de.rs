@@ -85,10 +85,13 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
             JSONValue::NaN => visitor.visit_f64(f64::NAN),
             JSONValue::Hexadecimal(s) => {
                 // Optionally convert to integer, or treat as string
-                if let Ok(hex) = u64::from_str_radix(s, 16) {
-                    visitor.visit_u64(hex)
-                } else {
-                    Err(de::Error::custom(format!("Invalid hex {}", s)))
+                match u64::from_str_radix(s.trim_start_matches("0x"), 16) {
+                    Ok(hex) => {
+                        visitor.visit_u64(hex)
+                    }
+                    Err(e) => {
+                        Err(de::Error::custom(format!("Invalid hex {}", e)))
+                    }
                 }
             }
             JSONValue::Unary { operator, value } => {
@@ -596,4 +599,543 @@ mod test {
 
     }
 
+
+}
+
+#[cfg(test)]
+mod json5_compat_tests {
+    use super::*; // Bring in your `from_str` parser.
+    use std::collections::BTreeMap; // Or HashMap, if preferred.
+    use serde::Deserialize;
+
+    /// A minimal JSON5-like "value" type for testing.
+    /// Adjust as needed for your parser’s feature set.
+    #[derive(Debug, PartialEq, Deserialize)]
+    #[serde(untagged)]
+    enum MyValue {
+        Null,
+        Bool(bool),
+        Number(f64),
+        String(String),
+        Array(Vec<MyValue>),
+        Object(BTreeMap<String, MyValue>),
+    }
+
+    /// Helper to parse a string with your JSON5 parser under test.
+    fn parse_test(input: &str) -> MyValue {
+        match from_str::<MyValue>(input) {
+            Ok(v) => v,
+            Err(e) => panic!("Error parsing input: {:?}", e),
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // Objects
+    // ------------------------------------------------------------------------
+
+    #[test]
+    fn object_empty() {
+        let v = parse_test(r#"{}"#);
+        match v {
+            MyValue::Object(map) => assert!(map.is_empty()),
+            _ => panic!("Expected an empty object"),
+        }
+    }
+
+    #[test]
+    fn object_double_quoted_key() {
+        let v = parse_test(r#"{"a":1}"#);
+        match v {
+            MyValue::Object(map) => {
+                assert_eq!(map.get("a"), Some(&MyValue::Number(1.0)));
+            }
+            _ => panic!("Expected an object with key 'a' = 1"),
+        }
+    }
+
+    #[test]
+    fn object_single_quoted_key() {
+        let v = parse_test(r#"{'a':1}"#);
+        match v {
+            MyValue::Object(map) => {
+                assert_eq!(map.get("a"), Some(&MyValue::Number(1.0)));
+            }
+            _ => panic!("Expected an object with key 'a' = 1"),
+        }
+    }
+
+    #[test]
+    fn object_unquoted_key() {
+        let v = parse_test(r#"{a:1}"#);
+        match v {
+            MyValue::Object(map) => {
+                assert_eq!(map.get("a"), Some(&MyValue::Number(1.0)));
+            }
+            _ => panic!("Expected an object with key 'a' = 1"),
+        }
+    }
+
+    #[test]
+    fn object_special_keys() {
+        let v = parse_test(r#"{$_:1,_$:2,a\u200C:3}"#);
+        dbg!(&v);
+        match v {
+            MyValue::Object(map) => {
+                assert_eq!(map.get("$_"), Some(&MyValue::Number(1.0)));
+                assert_eq!(map.get("_$"), Some(&MyValue::Number(2.0)));
+                assert_eq!(map.get("a\u{200C}"), Some(&MyValue::Number(3.0)));
+            }
+            _ => panic!("Expected an object with special keys $_, _$, and a\u{200C}"),
+        }
+    }
+
+    #[test]
+    fn object_unicode_key() {
+        let v = parse_test(r#"{ùńîċõďë:9}"#);
+        match v {
+            MyValue::Object(map) => {
+                assert_eq!(map.get("ùńîċõďë"), Some(&MyValue::Number(9.0)));
+            }
+            _ => panic!("Expected an object with unicode key 'ùńîċõďë' = 9"),
+        }
+    }
+
+
+    #[test]
+    fn object_unicode_key_quoted() {
+        let v = parse_test(r#"{"ùńîċõďë":9}"#);
+        match v {
+            MyValue::Object(map) => {
+                assert_eq!(map.get("ùńîċõďë"), Some(&MyValue::Number(9.0)));
+            }
+            _ => panic!("Expected an object with unicode key 'ùńîċõďë' = 9"),
+        }
+    }
+
+    #[test]
+    fn object_escaped_keys() {
+        let v = parse_test(r#"{\u0061\u0062:1,\u0024\u005F:2,\u005F\u0024:3}"#);
+        dbg!(&v);
+        match v {
+            MyValue::Object(map) => {
+                // \u0061\u0062 -> "ab"
+                assert_eq!(map.get("ab"), Some(&MyValue::Number(1.0)));
+                // \u0024\u005F -> "$_"
+                assert_eq!(map.get("$_"), Some(&MyValue::Number(2.0)));
+                // \u005F\u0024 -> "_$"
+                assert_eq!(map.get("_$"), Some(&MyValue::Number(3.0)));
+            }
+            _ => panic!("Expected escaped keys"),
+        }
+    }
+
+    #[test]
+    fn object_proto_name() {
+        let v = parse_test(r#"{"__proto__":1}"#);
+        match v {
+            MyValue::Object(map) => {
+                // In Rust, it's just a normal key:
+                assert_eq!(map.get("__proto__"), Some(&MyValue::Number(1.0)));
+            }
+            _ => panic!("Expected object with '__proto__' key"),
+        }
+    }
+
+    #[test]
+    fn object_multiple_properties() {
+        let v = parse_test(r#"{abc:1,def:2}"#);
+        match v {
+            MyValue::Object(map) => {
+                assert_eq!(map.get("abc"), Some(&MyValue::Number(1.0)));
+                assert_eq!(map.get("def"), Some(&MyValue::Number(2.0)));
+            }
+            _ => panic!("Expected object with {{abc:1,def:2}}"),
+        }
+    }
+
+    #[test]
+    fn object_nested() {
+        let v = parse_test(r#"{a:{b:2}}"#);
+        match v {
+            MyValue::Object(outer) => {
+                match outer.get("a") {
+                    Some(MyValue::Object(inner)) => {
+                        assert_eq!(inner.get("b"), Some(&MyValue::Number(2.0)));
+                    }
+                    _ => panic!("Expected a nested object {{b:2}}"),
+                }
+            }
+            _ => panic!("Expected object with key 'a'"),
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // Arrays
+    // ------------------------------------------------------------------------
+
+    #[test]
+    fn array_empty() {
+        let v = parse_test(r#"[]"#);
+        match v {
+            MyValue::Array(arr) => {
+                assert!(arr.is_empty());
+            }
+            _ => panic!("Expected an empty array"),
+        }
+    }
+
+    #[test]
+    fn array_single_value() {
+        let v = parse_test(r#"[1]"#);
+        match v {
+            MyValue::Array(arr) => {
+                assert_eq!(arr.len(), 1);
+                assert_eq!(arr[0], MyValue::Number(1.0));
+            }
+            _ => panic!("Expected [1]"),
+        }
+    }
+
+    #[test]
+    fn array_multiple_values() {
+        let v = parse_test(r#"[1,2]"#);
+        match v {
+            MyValue::Array(arr) => {
+                assert_eq!(arr, vec![MyValue::Number(1.0), MyValue::Number(2.0)]);
+            }
+            _ => panic!("Expected [1,2]"),
+        }
+    }
+
+    #[test]
+    fn array_nested() {
+        let v = parse_test(r#"[1,[2,3]]"#);
+        match v {
+            MyValue::Array(arr) => {
+                assert_eq!(arr.len(), 2);
+                assert_eq!(arr[0], MyValue::Number(1.0));
+                match &arr[1] {
+                    MyValue::Array(inner) => {
+                        assert_eq!(inner, &vec![MyValue::Number(2.0), MyValue::Number(3.0)]);
+                    }
+                    _ => panic!("Expected a nested array [2,3]"),
+                }
+            }
+            _ => panic!("Expected an array with nested array"),
+        }
+    }
+
+
+    #[test]
+    fn parse_null() {
+        let v = parse_test(r#"null"#);
+        assert_eq!(v, MyValue::Null);
+    }
+
+    #[test]
+    fn parse_true() {
+        let v = parse_test(r#"true"#);
+        assert_eq!(v, MyValue::Bool(true));
+    }
+
+    #[test]
+    fn parse_false() {
+        let v = parse_test(r#"false"#);
+        assert_eq!(v, MyValue::Bool(false));
+    }
+
+
+    #[test]
+    fn numbers_leading_zeroes() {
+        let v = parse_test(r#"[0,0.,0e0,]"#);
+        match v {
+            MyValue::Array(arr) => {
+                // All are 0.
+                assert_eq!(arr, vec![
+                    MyValue::Number(0.0),
+                    MyValue::Number(0.0),
+                    MyValue::Number(0.0),
+                ]);
+            }
+            _ => panic!("Expected array of zeros"),
+        }
+    }
+
+    #[test]
+    fn numbers_trailing_zeroes() {
+        let v = parse_test(r#"[.0]"#);
+        match v {
+            MyValue::Array(arr) => {
+                // All are 0.
+                assert_eq!(arr, vec![
+                    MyValue::Number(0.0),
+                ]);
+            }
+            _ => panic!("Expected array of zeros"),
+        }
+    }
+    #[test]
+    fn numbers_integers() {
+        let v = parse_test(r#"[1,23,456,7890]"#);
+        match v {
+            MyValue::Array(arr) => {
+                assert_eq!(arr, vec![
+                    MyValue::Number(1.0),
+                    MyValue::Number(23.0),
+                    MyValue::Number(456.0),
+                    MyValue::Number(7890.0),
+                ]);
+            }
+            _ => panic!("Expected integer array"),
+        }
+    }
+
+    #[test]
+    fn numbers_signed() {
+        let v = parse_test(r#"[-1,+2,-.1,-0]"#);
+        match v {
+            MyValue::Array(arr) => {
+                // Some tricky floating-point checks:
+                assert_eq!(arr[0], MyValue::Number(-1.0));
+                assert_eq!(arr[1], MyValue::Number(2.0));
+                assert_eq!(arr[2], MyValue::Number(-0.1));
+                // -0 is 0.0 in float equality:
+                let minus_zero = match arr[3] {
+                    MyValue::Number(f) => f,
+                    _ => panic!("Expected a number for -0"),
+                };
+                assert_eq!(minus_zero, 0.0);
+            }
+            _ => panic!("Expected array of signed numbers"),
+        }
+    }
+
+    #[test]
+    fn numbers_leading_decimal() {
+        let v = parse_test(r#"[.1,.23]"#);
+        match v {
+            MyValue::Array(arr) => {
+                assert_eq!(arr, vec![MyValue::Number(0.1), MyValue::Number(0.23)]);
+            }
+            _ => panic!("Expected array of leading-decimal numbers"),
+        }
+    }
+
+    #[test]
+    fn numbers_fractional() {
+        let v = parse_test(r#"[1.0,1.23]"#);
+        match v {
+            MyValue::Array(arr) => {
+                assert_eq!(arr, vec![MyValue::Number(1.0), MyValue::Number(1.23)]);
+            }
+            _ => panic!("Expected array with fractional numbers"),
+        }
+    }
+
+    #[test]
+    fn numbers_exponents() {
+        let v = parse_test(r#"[1e0,1e1,1e01,1.e0,1.1e0,1e-1,1e+1]"#);
+        match v {
+            MyValue::Array(arr) => {
+                let expected = vec![
+                    MyValue::Number(1.0),
+                    MyValue::Number(10.0),
+                    MyValue::Number(10.0),
+                    MyValue::Number(1.0),
+                    MyValue::Number(1.1),
+                    MyValue::Number(0.1),
+                    MyValue::Number(10.0),
+                ];
+                assert_eq!(arr, expected);
+            }
+            _ => panic!("Expected array of exponent numbers"),
+        }
+    }
+
+    #[test]
+    fn numbers_hexadecimal() {
+        let v = parse_test(r#"[0x1,0x10,0xff,0xFF]"#);
+        match v {
+            MyValue::Array(arr) => {
+                let expected = vec![
+                    MyValue::Number(1.0),
+                    MyValue::Number(16.0),
+                    MyValue::Number(255.0),
+                    MyValue::Number(255.0),
+                ];
+                assert_eq!(arr, expected);
+            }
+            _ => panic!("Expected array of hex numbers"),
+        }
+    }
+
+    #[test]
+    fn numbers_infinity() {
+        let v = parse_test(r#"[Infinity,-Infinity]"#);
+        match v {
+            MyValue::Array(arr) => {
+                match arr.as_slice() {
+                    [MyValue::Number(a), MyValue::Number(b)] => {
+                        assert!(a.is_infinite() && a.is_sign_positive());
+                        assert!(b.is_infinite() && b.is_sign_negative());
+                    }
+                    _ => panic!("Expected [Infinity, -Infinity]"),
+                }
+            }
+            _ => panic!("Expected array"),
+        }
+    }
+
+    #[test]
+    fn numbers_nan() {
+        let v = parse_test(r#"NaN"#);
+        match v {
+            MyValue::Number(f) => assert!(f.is_nan()),
+            _ => panic!("Expected NaN"),
+        }
+    }
+
+    #[test]
+    fn numbers_negative_nan() {
+        let v = parse_test(r#"-NaN"#);
+        match v {
+            MyValue::Number(f) => assert!(f.is_nan()),
+            _ => panic!("Expected -NaN"),
+        }
+    }
+
+    #[test]
+    fn numbers_single() {
+        let v = parse_test(r#"1"#);
+        assert_eq!(v, MyValue::Number(1.0));
+    }
+
+    #[test]
+    fn numbers_signed_explicit() {
+        let v = parse_test(r#"+1.23e100"#);
+        match v {
+            MyValue::Number(f) => {
+                assert_eq!(f, 1.23e100);
+            }
+            _ => panic!("Expected +1.23e100 as a number"),
+        }
+    }
+
+    #[test]
+    fn numbers_bare_hex() {
+        let v = parse_test(r#"0x1"#);
+        assert_eq!(v, MyValue::Number(1.0));
+    }
+
+    #[test]
+    #[should_panic]
+    fn numbers_bare_long_hex() {
+        let v = parse_test(r#"-0x0123456789abcdefABCDEF"#);
+        match v {
+            MyValue::Number(f) => {
+                // Very large; f might be approximate in float form. We just check it's a number.
+                assert!(f.is_sign_negative());
+            }
+            _ => panic!("Expected a negative large hex as a float number"),
+        }
+    }
+
+
+    #[test]
+    fn strings_double_quoted() {
+        let v = parse_test(r#""abc""#);
+        assert_eq!(v, MyValue::String("abc".to_owned()));
+    }
+
+    #[test]
+    fn strings_single_quoted() {
+        let v = parse_test(r#"'abc'"#);
+        assert_eq!(v, MyValue::String("abc".to_owned()));
+    }
+
+    #[test]
+    fn strings_quotes_in_strings() {
+        let v = parse_test(r#"['"',"'"]"#);
+        match v {
+            MyValue::Array(arr) => {
+                assert_eq!(arr, vec![
+                    MyValue::String("\"".to_owned()),
+                    MyValue::String("'".to_owned()),
+                ]);
+            }
+            _ => panic!("Expected an array with double-quote and single-quote strings"),
+        }
+    }
+
+    #[test]
+    fn strings_escaped_chars() {
+        // The JavaScript test includes many escapes plus line continuations.
+        let input = r#"'\\b\\f\\n\\r\\t\\v\\0\\x0f\\u01fF\\\n\\\r\n\\\r\\\u2028\\\u2029\\a\\'\\\"'"#;
+        let v = parse_test(input);
+        match v {
+            MyValue::String(s) => {
+                // Depending on your parser’s rules, this will be the interpreted string.
+                // Here, just check that we got a string (no parse error).
+                // You can do deeper checks if your parser decodes e.g. '\v' into ASCII 0x0B, etc.
+                assert!(!s.is_empty(), "Expected a non-empty string with escapes");
+            }
+            _ => panic!("Expected an escaped string"),
+        }
+    }
+
+    #[test]
+    fn strings_line_paragraph_separators() {
+        // If your parser warns about \u2028 or \u2029, that’s up to you to handle. Just parse.
+        let v = parse_test(r#"'\u2028\u2029'"#);
+        match v {
+            MyValue::String(s) => {
+                assert_eq!(s, "\u{2028}\u{2029}");
+            }
+            _ => panic!("Expected string with line/paragraph separators"),
+        }
+    }
+
+
+    #[test]
+    fn comments_single_line() {
+        let input = r#"{// comment
+        }"#;
+        let v = parse_test(input);
+        match v {
+            MyValue::Object(map) => assert!(map.is_empty()),
+            _ => panic!("Expected empty object"),
+        }
+    }
+
+    #[test]
+    fn comments_single_line_at_end() {
+        let input = r#"{}// comment"#;
+        let v = parse_test(input);
+        match v {
+            MyValue::Object(map) => assert!(map.is_empty()),
+            _ => panic!("Expected empty object"),
+        }
+    }
+
+    #[test]
+    fn comments_multi_line() {
+        let input = r#"{/* comment
+        ** */}"#;
+        let v = parse_test(input);
+        match v {
+            MyValue::Object(map) => assert!(map.is_empty()),
+            _ => panic!("Expected empty object"),
+        }
+    }
+
+    #[test]
+    fn whitespace() {
+        // Includes tabs, vertical tabs, form feeds, non-breaking spaces, etc.
+        let input = "{\t\u{000B}\u{000C} \u{00A0}\u{FEFF}\n\r\u{2028}\u{2029}\u{2003}}";
+        let v = parse_test(input);
+        match v {
+            MyValue::Object(map) => assert!(map.is_empty()),
+            _ => panic!("Expected empty object after whitespace"),
+        }
+    }
 }
