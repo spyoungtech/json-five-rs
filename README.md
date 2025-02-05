@@ -224,11 +224,8 @@ Note: string tokens will include surrounding quotes.
 
 ## Status
 
-This project is in **very** early phases. Some major pieces of functionality are missing, not least of which includes 
-correctly processing escapes from JSON strings to produce Rust string values. Although many test cases are passing, 
-it is safe to say it is not yet suitable for production use.
-
-More thorough testing is needed to ensure that the tokenizer/parser rejects invalid documents.
+This project is in **very** early phases. While the crate is usable right now, more thorough testing is needed to 
+ensure that the tokenizer/parser rejects invalid documents.
 
 Questions, discussions, and contributions are welcome. Right now, things are moving fast, so the best way to contribute 
 is likely to just [open an issue](https://github.com/spyoungtech/json-five-rs/issues).
@@ -247,13 +244,13 @@ parsing and serialization, including the ability to customize the style.
 
 Some things I need to implement and some things I may or may not implement. In rough priority order:
 
-- [ ] Publish crate
 - [ ] Move documentation from readme to crate documentation
 - [ ] Provide methods for safely editing models (e.g., validate that, when serialized, the model will produce a valid JSON5 document) today. This may also let us adjust the visibility of certain attributes.
 - [ ] Investigate `no_std` support
 - [ ] Optimize the round-trip tokenizer to avoid processing the input twice
 - [ ] More serialization formatting options (e.g., prefer single- or double-quoted strings, try to use identifiers where possible, etc.)
 - [ ] Incremental parsing. Originally, an incremental tokenizer/parser was actually developed. In testing, speeds were the same or worse. Maybe it could be done in a performant way. But this may be useful for specific use cases, such as memory-constrained environments, very large JSON5 files (why?), or use cases where the input is streamed (say, over the network).
+- [x] ~~Publish crate~~
 - [x] ~~Benchmarks~~
 - [x] ~~Basic formatting options (indent, compact, trailing comma)~~
 - [x] ~~Complete logic for serialization of values (specifically: processing all \[unicode\] escape sequences in strings/identifiers and handling certain float formats like `.0` and `1.`)~~
