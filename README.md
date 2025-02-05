@@ -2,6 +2,8 @@
 
 This project provides a handwritten JSON5 tokenizer and recursive descent parser compatible with `serde`.
 
+![Crates.io Version](https://img.shields.io/crates/v/json-five)
+
 # Key Features
 
 - Compatible with `serde` data model
