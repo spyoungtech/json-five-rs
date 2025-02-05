@@ -1,6 +1,4 @@
-use std::iter::Peekable;
 use crate::tokenize::{TokType, TokenSpan, TokenizationError};
-use crate::utils::get_line_col_char;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TokenContext {

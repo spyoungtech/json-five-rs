@@ -1,9 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::iter::Peekable;
 use std::slice::Iter;
-use std::vec::IntoIter;
 use crate::utils::get_line_col_char;
-use crate::rt::tokenize::{Token};
 use crate::tokenize::{TokType, TokenSpan, Tokens};
 #[derive(PartialEq, Debug, Clone)]
 pub enum UnaryOperator {
@@ -24,7 +22,7 @@ type Wsc = String; // Whitespace and comment tokens
 
 // {wsc.0} value {wsc.1}
 #[derive(PartialEq, Debug, Clone)]
-struct JSONTextContext {
+pub struct JSONTextContext {
     wsc: (Wsc, Wsc)
 }
 
@@ -91,44 +89,9 @@ pub enum JSONValue {
 #[derive(PartialEq, Debug)]
 pub struct JSONText {
     pub value: JSONValue,
-    pub(crate) context: Option<JSONTextContext>
+    pub context: Option<JSONTextContext>
 }
 
-
-#[allow(dead_code)]
-pub enum TrailingComma {
-    ALL,
-    OBJECTS,
-    ARRAYS,
-    NONE
-}
-
-pub struct StyleConfiguration {
-    pub(crate) indent: Option<usize>,
-    pub(crate) item_separator: String,
-    pub(crate) key_separator: String,
-    pub(crate) current_indent: usize,
-    pub(crate) trailing_comma: TrailingComma
-}
-
-#[allow(dead_code)]
-impl StyleConfiguration {
-    pub fn new(indent: Option<usize>, item_separator: &str, key_separator: &str, trailing_comma: TrailingComma) -> Self {
-        StyleConfiguration{indent: indent, item_separator: item_separator.to_string(), key_separator: key_separator.to_string(), current_indent: 0, trailing_comma: trailing_comma}
-    }
-
-    pub fn with_indent(indent: usize, trailing_comma: TrailingComma) -> Self {
-        StyleConfiguration{indent: Some(indent), item_separator: ",".to_string(), key_separator: ": ".to_string(), trailing_comma, current_indent: 0}
-    }
-
-    pub fn with_separators(item_separator: &str, key_separator: &str, trailing_comma: TrailingComma) -> Self {
-        StyleConfiguration{indent: Some(0), key_separator: key_separator.to_string(), trailing_comma, item_separator: item_separator.to_string(), current_indent: 0}
-    }
-
-    pub fn default() -> Self {
-        StyleConfiguration{indent: None, item_separator: ", ".to_string(), key_separator: ": ".to_string(), current_indent: 0, trailing_comma: TrailingComma::NONE}
-    }
-}
 
 impl JSONKeyValuePair {
     // key {wsc.0} COLON {wsc.1} value {wsc.2} [ COMMA {wsc.3} ] [ next_kvp ]
@@ -149,10 +112,6 @@ impl JSONKeyValuePair {
             }
         }
     }
-}
-
-struct JSONTextIterator {
-    model: JSONText
 }
 
 
@@ -647,7 +606,6 @@ pub fn from_str(source: &str) -> Result<JSONText, ParsingError> {
 #[cfg(test)]
 mod tests {
     use crate::tokenize::Tokenizer;
-    use crate::rt::parser::JSONValue::*;
     use super::*;
     #[test]
     fn test_foo() {

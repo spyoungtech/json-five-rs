@@ -45,17 +45,6 @@ pub struct Tokens<'input> {
     pub(crate) source: &'input str
 }
 
-use crate::rt::tokenize::Token;
-
-
-
-
-
-impl<'input> Tokens<'input> {
-    pub(crate) fn spans_with_source(&self) -> Vec<(&TokenSpan, &'input str)> {
-        self.tok_spans.iter().map(|span| (span, &self.source[span.0 .. span.2])).collect()
-    }
-}
 
 #[derive(Debug)]
 pub struct TokenizationError {
@@ -402,7 +391,6 @@ impl <'input> Tokenizer<'input> {
                         self.advance();
                         continue
                     } else if *next_char == '\\' {
-                        last_char = *next_char;
                         self.advance();
                         match self.advance() {
                             None => {return Err(self.make_error("Unexpected EOF".to_string(), start_idx))}
