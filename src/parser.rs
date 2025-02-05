@@ -570,7 +570,7 @@ mod tests {
     #[test]
     fn test_illegal_identifier_escape() {
         let text = r#"{ \u0031foo: 123 }"#;
-        let res = from_str(text).unwrap_err();
+        from_str(text).unwrap_err();
     }
 
     #[test]

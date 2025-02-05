@@ -368,7 +368,7 @@ impl <'input> Tokenizer<'input> {
                                 }
                                 let maybe_hex_val = read_hex_digits(&mut ubuffer.chars().peekable(), 4, ubuffer.as_str());
                                 match maybe_hex_val {
-                                    Err(e) => {
+                                    Err(_) => {
                                         return Err(self.make_error(format!("invalid unicode escape: \\u{}", ubuffer), start_idx))
                                     }
                                     Ok(hex_val) => {

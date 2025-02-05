@@ -9,7 +9,7 @@ pub(crate) fn get_line_col_char(doc: &str, byte_offset: usize) -> (usize, usize,
 
     if byte_offset == doc.len() {
         let last_char_pos = doc.char_indices().last().unwrap(); // (byte_off, char)
-        let (mut lineno, mut colno, mut codepoint_off) = get_line_col_char(doc, last_char_pos.0);
+        let (lineno, mut colno, mut codepoint_off) = get_line_col_char(doc, last_char_pos.0);
         colno += 1;
         codepoint_off += 1;
         return (lineno, colno, codepoint_off);
@@ -60,6 +60,7 @@ pub (crate) fn escape_double_quoted(input: &str) -> String {
     escaped
 }
 
+#[allow(dead_code)]
 pub (crate) fn escape_single_quoted(input: &str) -> String {
     let mut escaped = String::with_capacity(input.len() * 2);
     for c in input.chars() {
