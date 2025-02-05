@@ -2,10 +2,11 @@ use json_five::rt::tokenize::{Token, source_to_tokens, tokens_to_source};
 use json_five::tokenize::TokType;
 use regex::Regex;
 
-fn escape_unescaped_double_quotes(s: &str) -> String {
+fn double_quote_to_single_quote(s: &str) -> String {
     let escape_double_quotes = Regex::new(r#"([^\\]")"#).unwrap();
-    let unescape_single_quote_escapes = Regex::new(r#"(?P<non_escape>[^\\])(\\')"#).unwrap();
+
     // technically, this may miss some cases, but for sake of example, this should be ok
+    let unescape_single_quote_escapes = Regex::new(r#"(?P<non_escape>[^\\])(\\')"#).unwrap();
 
     // first add escapes to any un-escaped double quotes
     let mut res = escape_double_quotes.replace_all(s, "\\\"").to_string();
@@ -21,7 +22,7 @@ fn replace_tokens(in_tokens: &Vec<Token>) -> Vec<Token> {
     for tok in in_tokens {
         match tok.tok_type {
             TokType::SingleQuotedString => {
-                let inner_lexeme = escape_unescaped_double_quotes(&tok.lexeme[1 .. tok.lexeme.len() - 1 ]);
+                let inner_lexeme = double_quote_to_single_quote(&tok.lexeme[1 .. tok.lexeme.len() - 1 ]);
                 let lexeme = format!("\"{}\"", inner_lexeme);
 
                 let new_token = Token{lexeme, tok_type: TokType::DoubleQuotedString, context: None};
