@@ -155,18 +155,20 @@ impl <'input> Tokenizer<'input> {
     }
 
     fn process_whitespace(&mut self) -> Result<TokenSpan, TokenizationError> {
-        let (start_idx, _) = self.lookahead.expect("Unexpected end of input, was expecting whitespace char");
+        let (start_idx, start_char) = self.lookahead.expect("Unexpected end of input, was expecting whitespace char");
         let mut last_index = start_idx;
+        let mut last_char = start_char;
         loop {
             match self.chars.peek() {
-                None => break Ok((start_idx, TokType::Whitespace, last_index + 1)),
+                None => break Ok((start_idx, TokType::Whitespace, last_index + last_char.len_utf8())),
                 Some((peeked_idx, peeked_char)) => {
                     if peeked_char.is_whitespace() {
                         last_index = *peeked_idx;
+                        last_char = *peeked_char;
                         self.advance();
                         continue
                     } else {
-                        break Ok((start_idx, TokType::Whitespace, last_index+1))
+                        break Ok((start_idx, TokType::Whitespace, last_index + last_char.len_utf8()))
                     }
                 }
             }
@@ -391,6 +393,7 @@ impl <'input> Tokenizer<'input> {
                         break self.tok_from_indices(start_idx, last_idx + last_char.len_utf8())
                     } else if next_char.is_alphanumeric() {
                         last_idx = *next_idx;
+                        last_char = *next_char;
                         self.advance();
                         continue
                     } else if IDENTIFIER_PARTS.contains(*next_char) {
@@ -399,6 +402,7 @@ impl <'input> Tokenizer<'input> {
                         self.advance();
                         continue
                     } else if *next_char == '\\' {
+                        last_char = *next_char;
                         self.advance();
                         match self.advance() {
                             None => {return Err(self.make_error("Unexpected EOF".to_string(), start_idx))}
