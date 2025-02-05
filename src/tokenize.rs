@@ -337,6 +337,7 @@ impl <'input> Tokenizer<'input> {
     }
 
     fn process_identifier_or_const(&mut self) -> Result<TokenSpan, TokenizationError> {
+        use crate::utils::read_hex_digits;
         let (start_idx, start_char) = self.lookahead.expect("Unexpected end of input, was expecting identifier/const char");
         let mut last_idx = start_idx;
         use unicode_general_category::{get_general_category, GeneralCategory};
@@ -349,6 +350,7 @@ impl <'input> Tokenizer<'input> {
                     Some((_, c)) => {
                         match c {
                             'u' => {
+                                let mut ubuffer = String::with_capacity(4);
                                 self.advance();
                                 for _ in 0..4 {
                                     match self.advance() {
@@ -356,9 +358,29 @@ impl <'input> Tokenizer<'input> {
                                             return Err(self.make_error("Invalid identifier start".to_string(), start_idx))
                                         }
                                         Some((idx, c)) => {
+                                            ubuffer.push(c);
                                             last_idx = idx;
                                             if !HEX_CHARS.contains(c) {
                                                 return Err(self.make_error("Invalid identifier start".to_string(), start_idx))
+                                            }
+                                        }
+                                    }
+                                }
+                                let maybe_hex_val = read_hex_digits(&mut ubuffer.chars().peekable(), 4, ubuffer.as_str());
+                                match maybe_hex_val {
+                                    Err(e) => {
+                                        return Err(self.make_error(format!("invalid unicode escape: \\u{}", ubuffer), start_idx))
+                                    }
+                                    Ok(hex_val) => {
+                                        let maybe_c = char::from_u32(hex_val);
+                                        match maybe_c {
+                                            None => {
+                                                return Err(self.make_error(format!("invalid unicode escape value: \\u{}", ubuffer), start_idx))
+                                            }
+                                            Some(c) => {
+                                                if !c.is_alphabetic() && !IDENTIFIER_START_SYMBOLS.contains(c) {
+                                                    return Err(self.make_error(format!("Illegal identifier start from unicode escape sequence: \\u{}", ubuffer), start_idx))
+                                                }
                                             }
                                         }
                                     }

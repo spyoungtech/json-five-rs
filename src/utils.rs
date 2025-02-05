@@ -128,7 +128,7 @@ pub fn unescape(input: &str) -> Result<String, String> {
 
 /// Read exactly `count` hex digits from `chars`, returning the combined u32.
 /// The `context` helps produce a clearer error message (like `"\u"` or `"\x"`).
-fn read_hex_digits<I: Iterator<Item = char>>(
+pub (crate) fn read_hex_digits<I: Iterator<Item = char>>(
     chars: &mut std::iter::Peekable<I>,
     count: usize,
     context: &str

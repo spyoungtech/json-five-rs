@@ -519,11 +519,24 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
             Some(span) => {
                 match span.1 {
                     TokType::Plus => {
-                        let value = self.parse_unary()?; // TODO: validate value is appropriate for unary
+                        let value = self.parse_unary()?;
+                        match value {
+                            JSONValue::Float(_) | JSONValue::Integer(_) | JSONValue::Infinity | JSONValue::NaN | JSONValue::Unary { .. } | JSONValue::Hexadecimal(_) => {}
+                            val => {
+                                return Err(self.make_error(format!("Unary operations not allowed for value {:?}", val), span.2))
+                            }
+                        }
+
                         Ok(JSONValue::Unary {operator: UnaryOperator::Plus, value: Box::new(value)})
                     }
                     TokType::Minus => {
-                        let value = self.parse_unary()?; // TODO: validate value is appropriate for unary
+                        let value = self.parse_unary()?;
+                        match value {
+                            JSONValue::Float(_) | JSONValue::Integer(_) | JSONValue::Infinity | JSONValue::NaN | JSONValue::Unary { .. } | JSONValue::Hexadecimal(_) => {}
+                            val => {
+                                return Err(self.make_error(format!("Unary operations not allowed for value {:?}", val), span.2))
+                            }
+                        }
                         Ok(JSONValue::Unary {operator: UnaryOperator::Minus, value: Box::new(value)})
                     }
                     _ => panic!("no")
@@ -612,6 +625,12 @@ mod tests {
         let res = from_str("{}").unwrap();
         let expected = JSONText{context: Some(JSONTextContext{wsc: (String::new(), String::new())}), value: JSONValue::JSONObject {key_value_pairs: vec![], context: Some(JSONObjectContext{wsc: (String::new(),)})}};
         assert_eq!(res.value, expected.value)
+    }
+
+    #[test]
+    fn test_illegal_identifier_escape() {
+        let text = r#"{ \u0031foo: 123 }"#;
+        let res = from_str(text).unwrap_err();
     }
 
     #[test]
