@@ -225,6 +225,7 @@ Some things I need to implement and some things I may or may not implement. In r
 - [ ] Move documentation from readme to crate documentation
 - [ ] Provide methods for safely editing models (e.g., validate that, when serialized, the model will produce a valid JSON5 document) today. This may also let us adjust the visibility of certain attributes.
 - [ ] Benchmarks
+- [ ] Investigate `no_std` support
 - [ ] Optimize the round-trip tokenizer to avoid processing the input twice
 - [ ] More serialization formatting options (e.g., prefer single- or double-quoted strings, try to use identifiers where possible, etc.)
 - [ ] Incremental parsing. Originally, an incremental tokenizer/parser was actually developed. In testing, speeds were the same or worse. Maybe it could be done in a performant way. But this may be useful for specific use cases, such as memory-constrained environments, very large JSON5 files (why?), or use cases where the input is streamed (say, over the network).
