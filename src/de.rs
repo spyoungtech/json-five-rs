@@ -96,15 +96,11 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
                 }
             }
             JSONValue::Unary { operator, value } => {
-                // For demonstration, we’ll just handle plus/minus on numbers:
                 let sign = match operator {
                     UnaryOperator::Plus => 1.0,
                     UnaryOperator::Minus => -1.0,
                 };
-                // Re-enter the deserializer with the underlying value
                 let inner_de = JSONValueDeserializer { input: &**value };
-                // If you want to handle +foo or -foo as floats (e.g. -3.14)
-                // we can parse it out carefully:
                 let number: f64 = Deserialize::deserialize(inner_de)?;
                 visitor.visit_f64(sign * number)
             }
@@ -1071,14 +1067,13 @@ mod json5_compat_tests {
     #[test]
     fn strings_escaped_chars() {
         // The JavaScript test includes many escapes plus line continuations.
-        let input = r#"'\\b\\f\\n\\r\\t\\v\\0\\x0f\\u01fF\\\n\\\r\n\\\r\\\u2028\\\u2029\\a\\'\\\"'"#;
+        let input = "'\\a\\b\\f\\n\\r\\t\\v\\0\\x0f\\u01fF\\\n\\\r\n\\\r\\\u{2028}\\\u{2029}\\'\\\"'";
+        println!("{:?}", input);
         let v = parse_test(input);
+        let expected = String::from("\x07\x08\x0C\n\r\t\x0B\0\x0f\u{01fF}\n\r\n\r\u{2028}\u{2029}'\"");
         match v {
             MyValue::String(s) => {
-                // Depending on your parser’s rules, this will be the interpreted string.
-                // Here, just check that we got a string (no parse error).
-                // You can do deeper checks if your parser decodes e.g. '\v' into ASCII 0x0B, etc.
-                assert!(!s.is_empty(), "Expected a non-empty string with escapes");
+                assert_eq!(s, expected)
             }
             _ => panic!("Expected an escaped string"),
         }
@@ -1086,7 +1081,6 @@ mod json5_compat_tests {
 
     #[test]
     fn strings_line_paragraph_separators() {
-        // If your parser warns about \u2028 or \u2029, that’s up to you to handle. Just parse.
         let v = parse_test(r#"'\u2028\u2029'"#);
         match v {
             MyValue::String(s) => {

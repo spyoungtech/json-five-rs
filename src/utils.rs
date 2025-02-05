@@ -96,6 +96,7 @@ pub fn unescape(input: &str) -> Result<String, String> {
             // We have a backslash; look at the next char
             let esc = chars.next().ok_or_else(|| err("Incomplete escape at end of string"))?;
             match esc {
+                'a' => output.push('\x07'),
                 'n' =>  output.push('\n'),
                 'r' =>  output.push('\r'),
                 't' =>  output.push('\t'),
@@ -107,6 +108,9 @@ pub fn unescape(input: &str) -> Result<String, String> {
                 '\'' => output.push('\''),
                 '"'  => output.push('\"'),
                 '/'  => output.push('/'), // optional in JSON5
+                '\n' | '\r' | '\u{2028}' | '\u{2029}' => {
+                    output.push(esc);
+                }
                 'x' => {
                     // \xNN => exactly 2 hex digits
                     let val = read_hex_digits(&mut chars, 2, "\\x")?;
@@ -119,7 +123,7 @@ pub fn unescape(input: &str) -> Result<String, String> {
                 }
                 _ => {
                     // Unknown escape
-                    return Err(format!("Unknown escape sequence: \\{}", esc));
+                    return Err(format!("Unknown escape character: {}", esc));
                 }
             }
         }

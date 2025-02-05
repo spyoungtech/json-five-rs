@@ -114,6 +114,8 @@ impl <'input> Tokenizer<'input> {
             _ => unreachable!("Expected quote character, but got {:?}", quote_char)
         };
 
+        let mut last_char = quote_char;
+
         let mut escaping = false;
         loop {
             match self.advance() {
@@ -124,12 +126,23 @@ impl <'input> Tokenizer<'input> {
                     match char {
                         '\\' => {
                             escaping = !escaping;
+                            last_char = char;
+                            continue
                         }
-                        '\n' | '\r' | '\u{2028}' | '\u{2029}' => {
+                        '\n' => {
+                            if !escaping && last_char != '\r' {
+                                break Err(self.make_error("Unexpected line terminator without continuation in string literal at".to_string(), idx))
+                            }
+                            escaping = false;
+                            last_char = char;
+                            continue
+                        }
+                        '\r' | '\u{2028}' | '\u{2029}' => {
                             if !escaping {
                                 break Err(self.make_error("Unexpected line terminator without continuation in string literal at".to_string(), idx))
                             }
                             escaping = false;
+                            last_char = char;
                             continue
                         },
                         c if c == quote_char && !escaping => {
@@ -137,6 +150,7 @@ impl <'input> Tokenizer<'input> {
                         },
                         _ => {
                             escaping = false;
+                            last_char = char;
                             continue
                         }
                     }
