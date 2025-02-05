@@ -123,11 +123,7 @@ impl <'input> Tokenizer<'input> {
                 Some((idx, char)) => {
                     match char {
                         '\\' => {
-                            if escaping {
-                                escaping = false;
-                            } else {
-                                escaping = true;
-                            }
+                            escaping = !escaping;
                         }
                         '\n' | '\r' | '\u{2028}' | '\u{2029}' => {
                             if !escaping {
@@ -140,9 +136,7 @@ impl <'input> Tokenizer<'input> {
                             break Ok((start_idx, string_type, idx+1))
                         },
                         _ => {
-                            if escaping {
-                                escaping = false
-                            }
+                            escaping = false;
                             continue
                         }
                     }
