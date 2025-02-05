@@ -111,7 +111,7 @@ impl <'input> Tokenizer<'input> {
         let string_type: TokType = match quote_char {
             '"' => TokType::DoubleQuotedString,
             '\'' => TokType::SingleQuotedString,
-            _ => panic!("Expected quote character, but got {:?}", quote_char)
+            _ => unreachable!("Expected quote character, but got {:?}", quote_char)
         };
 
         let mut last_char = quote_char; // to keep track of escapes
@@ -178,7 +178,7 @@ impl <'input> Tokenizer<'input> {
         let (_, x_char) = self.advance().expect("Expected hex x");
         assert_eq!(start_char, '0');
         if x_char != 'x' && x_char != 'X' {
-            panic!("Invalid hexadecimal here")
+            unreachable!("Invalid hexadecimal here")
         }
 
         match self.advance() {
@@ -499,7 +499,7 @@ impl <'input> Tokenizer<'input> {
                     }
                 }
             }
-            _ => panic!("Invalid second comment char")
+            _ => unreachable!("Invalid second comment char")
         }
     }
 
