@@ -1,6 +1,7 @@
 use serde::de::{self, DeserializeSeed, Deserialize, Deserializer, MapAccess, SeqAccess, VariantAccess, Visitor};
 use std::fmt;
 use crate::parser::{JSONValue, JSONKeyValuePair, UnaryOperator, from_str as model_from_str};
+use crate::utils::unescape;
 #[derive(Debug)]
 pub enum SerdeJSON5Error {
     Custom(String),
@@ -41,9 +42,9 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
             JSONValue::Null => visitor.visit_unit(),
             JSONValue::Bool(b) => visitor.visit_bool(*b),
             JSONValue::DoubleQuotedString(s) | JSONValue::SingleQuotedString(s) => {
-                visitor.visit_str(s)
+                visitor.visit_str(unescape(s).unwrap().as_str())
             }
-            JSONValue::Identifier(s) => visitor.visit_str(s),
+            JSONValue::Identifier(s) => visitor.visit_str(unescape(s).unwrap().as_str()),
             JSONValue::JSONObject { key_value_pairs } => {
                 // Treat as a map
                 let mut map_deserializer = JSONMapAccess {
@@ -393,7 +394,7 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
         match self.input {
             JSONValue::Identifier(s)
             | JSONValue::DoubleQuotedString(s)
-            | JSONValue::SingleQuotedString(s) => visitor.visit_str(s),
+            | JSONValue::SingleQuotedString(s) => visitor.visit_str(unescape(s).unwrap().as_str()),
             _ => self.deserialize_any(visitor),
         }
     }
