@@ -48,6 +48,32 @@ See the `examples/` directory for examples of programs that utilize round-trippi
 - `examples/json5-doublequote-fixer` gives an example of tokenization-based round-tripping edits
 - `examples/json5-trailing-comma-formatter` gives an example of model-based round-tripping edits
 
+## Benchmarking
+
+Benchmarks are available in the `benches/` directory. Test data is in the `data/` directory. A couple of benchmarks use
+big files that are not committed to this repo. So run `./data/setupdata.sh` to download the required data files
+so that you don't skip the big benchmarks. The benchmarks compare `json_five` (this crate) to
+[serde_json](https://github.com/serde-rs/json) and [json5-rs](https://github.com/callum-oakley/json5-rs).
+
+Notwithstanding the general caveats of benchmarks, in initial testing, `json_five` outperforms `json5-rs`.
+In typical scenarios: 3-4x performance, it seems. At time of writing (pre- v0) no performance optimizations have been done. I 
+expect performance to improve, if at least marginally, in the future.
+
+These benchmarks were run on Windows on an i9-10900K. This table won't be updated unless significant changes happen.
+
+|      test     |   json_five   |   serde_json  | json5         |
+|---------------|---------------|---------------|---------------|
+|      big      |   580.31 ms   |   150.39 ms   | 3.0861 s      |
+|     empty     |   228.62 ns   |   38.786 ns   | 708.00 ns     |
+|  medium-ascii |   199.88 ms   |   59.008 ms   | 706.94 ms     |
+|     arrays    |   578.24 ns   |   100.95 ns   | 1.3228 µs     |
+|    objects    |   922.91 ns   |   205.75 ns   | 2.0748 µs     |
+|  nested-array |   22.990 µs   |   5.0483 µs   | 29.356 µs     |
+| nested-objects|   50.659 µs   |   14.755 µs   | 132.75 µs     |
+|     string    |   421.17 ns   |   91.051 ns   | 3.5691 µs     |
+|     number    |   238.75 ns   |   36.179 ns   | 779.13 ns     |
+
+
 
 # Round-trip model
 
@@ -214,19 +240,20 @@ and may only need to rely on the tokenizer and/or AST tree features. By default,
 but this can be disabled. Even without the `serde` feature, the parser modules provide functions and methods for 
 parsing and serialization, including the ability to customize the style.
 
+
 ## TODOs
 
 Some things I need to implement and some things I may or may not implement. In rough priority order:
 
-- [ ] Complete logic for serialization of values (specifically: processing all \[unicode\] escape sequences in strings/identifiers and handling certain float formats like `.0` and `1.`)
-- [ ] Come up with a way to reject invalid unicode escape sequences (e.g., when an illegal escape sequence is used at the start of an identifier)
-- [ ] Validate correctness of the tokenizer (specifically: use of `is_alphabetic` may not comport with the JSON5 spec)
 - [ ] Publish crate
 - [ ] Move documentation from readme to crate documentation
 - [ ] Provide methods for safely editing models (e.g., validate that, when serialized, the model will produce a valid JSON5 document) today. This may also let us adjust the visibility of certain attributes.
-- [ ] Benchmarks
 - [ ] Investigate `no_std` support
 - [ ] Optimize the round-trip tokenizer to avoid processing the input twice
 - [ ] More serialization formatting options (e.g., prefer single- or double-quoted strings, try to use identifiers where possible, etc.)
 - [ ] Incremental parsing. Originally, an incremental tokenizer/parser was actually developed. In testing, speeds were the same or worse. Maybe it could be done in a performant way. But this may be useful for specific use cases, such as memory-constrained environments, very large JSON5 files (why?), or use cases where the input is streamed (say, over the network).
+- [x] ~~Benchmarks~~
 - [x] ~~Basic formatting options (indent, compact, trailing comma)~~
+- [x] ~~Complete logic for serialization of values (specifically: processing all \[unicode\] escape sequences in strings/identifiers and handling certain float formats like `.0` and `1.`)~~
+- [x] ~~Come up with a way to reject invalid unicode escape sequences (e.g., when an illegal escape sequence is used at the start of an identifier)~~
+- [ ] ~~Validate correctness of the tokenizer (specifically: use of `is_alphabetic` may not comport with the JSON5 spec)~~
