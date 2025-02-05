@@ -1,11 +1,19 @@
 use json_five::rt::tokenize::{Token, source_to_tokens, tokens_to_source};
 use json_five::tokenize::TokType;
 use regex::Regex;
-use json_five::rt::parser::JSONText;
 
 fn escape_unescaped_double_quotes(s: &str) -> String {
-    let re = Regex::new(r#"([^\\]")"#).unwrap();
-    re.replace_all(s, "\\\"").to_string()
+    let escape_double_quotes = Regex::new(r#"([^\\]")"#).unwrap();
+    let unescape_single_quote_escapes = Regex::new(r#"(?P<non_escape>[^\\])(\\')"#).unwrap();
+    // technically, this may miss some cases, but for sake of example, this should be ok
+
+    // first add escapes to any un-escaped double quotes
+    let mut res = escape_double_quotes.replace_all(s, "\\\"").to_string();
+
+    // then remove any unnecessary single quote escapes
+    res = unescape_single_quote_escapes.replace_all(res.as_str(), "$non_escape'").to_string();
+
+    res
 }
 
 fn replace_tokens(in_tokens: &Vec<Token>) -> Vec<Token> {
@@ -14,8 +22,6 @@ fn replace_tokens(in_tokens: &Vec<Token>) -> Vec<Token> {
         match tok.tok_type {
             TokType::SingleQuotedString => {
                 let inner_lexeme = escape_unescaped_double_quotes(&tok.lexeme[1 .. tok.lexeme.len() - 1 ]);
-                // we could also try unescaping any now-unnecessary single-quote escapes
-                // but for the purpose of the example, we will not bother.
                 let lexeme = format!("\"{}\"", inner_lexeme);
 
                 let new_token = Token{lexeme, tok_type: TokType::DoubleQuotedString, context: None};
@@ -52,7 +58,8 @@ fn main() {
         'spam'
     ],
     objekt: { // < -- this key, too
-        nested: 'value' // <-- and this key and value
+        nested: 'inner \"escaped double quotes\" will not be double-escaped',
+        unescape: 'inner \'unnecessary escapes\' will be removed'
     }
 }"#;
     println!("{}", format_str(doc));

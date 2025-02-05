@@ -2,8 +2,6 @@
 
 This example shows how to use the round-trip tokenizer to edit/format a JSON5 document.
 
-
-
 e.g.
 
 ```rust
@@ -17,7 +15,8 @@ fn main() {
         'spam'
     ],
     objekt: { // < -- this key, too
-        nested: 'value' // <-- and this key and value
+        nested: 'inner \"escaped double quotes\" will not be double-escaped',
+        unescape: 'inner \'unnecessary escapes\' will be removed'
     }
 }"#;
     println!("{}", format_str(doc));
@@ -34,7 +33,8 @@ output:
         "spam"
     ],
     "objekt": { // < -- this key, too
-        "nested": "value" // <-- and this key and value
+        "nested": "inner \"escaped double quotes\" will not be double-escaped",
+        "unescape": "inner 'unnecessary escapes' will be removed"
     }
 }
 ```
