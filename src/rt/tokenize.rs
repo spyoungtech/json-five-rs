@@ -31,7 +31,8 @@ pub fn source_to_tokens(text: &str) -> Result<Vec<Token>, TokenizationError> {
     match spans.next() {
         None => {
             // empty doc
-            todo!()
+            source_tokens.push(Token{lexeme: String::new(), tok_type:TokType::EOF, context: Some(TokenContext{start_byte_offset: 0, start_colno: 1, start_lineno: 1, start_char_index: 0, end_byte_offset: 0})});
+            return Ok(source_tokens)
         }
         Some(span) => {
             next_span = span;

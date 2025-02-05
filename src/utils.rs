@@ -4,7 +4,17 @@ pub(crate) fn get_line_col_char(doc: &str, byte_offset: usize) -> (usize, usize,
     if byte_offset == 0 {
         return (1, 1, 0)
     }
-    assert!(byte_offset < doc.len(), "requested byteoffset {} is not less than doc length ({})", byte_offset, doc.len());
+
+    assert!(byte_offset <= doc.len(), "requested byteoffset {} is not less than or equal to doc length ({})", byte_offset, doc.len());
+
+    if byte_offset == doc.len() {
+        let last_char_pos = doc.char_indices().last().unwrap(); // (byte_off, char)
+        let (mut lineno, mut colno, mut codepoint_off) = get_line_col_char(doc, last_char_pos.0);
+        colno += 1;
+        codepoint_off += 1;
+        return (lineno, colno, codepoint_off);
+    }
+
     for (codepoint_off, (byte_off, char)) in doc.char_indices().enumerate() {
         colno += 1;
         if char == '\n' {
@@ -21,10 +31,10 @@ pub(crate) fn get_line_col_char(doc: &str, byte_offset: usize) -> (usize, usize,
             return (lineno, colno, codepoint_off)
         }
         if byte_off > byte_offset {
-            panic!("Byteoffset lands in the middle of a character")
+            unreachable!("Byteoffset lands in the middle of a character")
         }
     }
-    panic!("Reached end of document")
+    unreachable!("Reached end of document")
 }
 
 

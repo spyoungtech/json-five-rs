@@ -467,7 +467,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
             TokType::EOF => {
                 match self.position() {
                     0 => Err(self.make_error("Unexpected EOF. Was expecting value.".to_string(), 0)),
-                    pos => Err(self.make_error("Unexpected EOF".to_string(), pos-1))
+                    pos => Err(self.make_error("Unexpected EOF".to_string(), pos))
                 }
             },
             t => Err(self.make_error(format!("Unexpected token of type {:?}: {:?}", t, self.get_tok_source(span)), span.0))
@@ -2271,7 +2271,6 @@ bar"
 
 
     #[test]
-    #[ignore]
     fn test_error_top_level_block_comment_index() {
         let sample = r#"/*
     This should fail;
@@ -2290,7 +2289,6 @@ bar"
     }
 
     #[test]
-    #[ignore]
     fn test_error_top_level_block_comment_colno() {
         let sample = r#"/*
     This should fail;
@@ -2327,7 +2325,6 @@ bar"
 
 
     #[test]
-    #[ignore]
     fn test_error_top_level_inline_comment_index() {
         let sample = r#"// This should fail; comments cannot be the only top-level value."#;
         let maybe_tokens = Tokenizer::new(sample).tokenize();
@@ -2343,7 +2340,6 @@ bar"
     }
 
     #[test]
-    #[ignore]
     fn test_error_top_level_inline_comment_colno() {
         let sample = r#"// This should fail; comments cannot be the only top-level value."#;
         let maybe_tokens = Tokenizer::new(sample).tokenize();
