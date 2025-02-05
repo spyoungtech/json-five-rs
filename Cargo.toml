@@ -13,3 +13,12 @@ serde = ["dep:serde"]
 [dev-dependencies.serde]
 version = "*"
 features = ["derive"]
+
+[dev-dependencies]
+criterion = { version="0.5" }
+serde_json = "1.0"
+json5 = "0.4.1"
+
+[[bench]]
+name = "bench_compare"
+harness = false
