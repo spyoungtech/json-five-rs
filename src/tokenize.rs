@@ -382,19 +382,20 @@ impl <'input> Tokenizer<'input> {
                 return Err(self.make_error(format!("Invalid character {}", start_char), start_idx))
             }
         }
-
+        let mut last_char = start_char;
         loop {
             match self.chars.peek() {
-                None => break self.tok_from_indices(start_idx, last_idx+1),
+                None => break self.tok_from_indices(start_idx, last_idx + last_char.len_utf8()),
                 Some((next_idx, next_char)) => {
                     if next_char.is_whitespace() {
-                        break self.tok_from_indices(start_idx, last_idx+1)
+                        break self.tok_from_indices(start_idx, last_idx + last_char.len_utf8())
                     } else if next_char.is_alphanumeric() {
                         last_idx = *next_idx;
                         self.advance();
                         continue
                     } else if IDENTIFIER_PARTS.contains(*next_char) {
                         last_idx = *next_idx;
+                        last_char = *next_char;
                         self.advance();
                         continue
                     } else if *next_char == '\\' {
@@ -418,7 +419,7 @@ impl <'input> Tokenizer<'input> {
                                                 }
                                             }
                                         }
-                                        last_idx = self.lookahead.unwrap().0
+                                        (last_idx, last_char) = self.lookahead.unwrap()
                                     }
                                     _ => {
                                         return Err(self.make_error("Invalid unquoted key3".to_string(), start_idx))
@@ -430,10 +431,11 @@ impl <'input> Tokenizer<'input> {
                         match get_general_category(*next_char) {
                             GeneralCategory::NonspacingMark | GeneralCategory::SpacingMark => {
                                 last_idx = *next_idx;
+                                last_char = *next_char;
                                 self.advance();
                                 continue
                             }
-                            _ => break self.tok_from_indices(start_idx, last_idx + 1)
+                            _ => break self.tok_from_indices(start_idx, last_idx + last_char.len_utf8())
                         }
                     }
                 }
