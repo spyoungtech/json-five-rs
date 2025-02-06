@@ -636,6 +636,10 @@ impl<'input> Iterator for Tokenizer<'input> {
     }
 }
 
+
+/// Turn str into [Tokens].
+///
+/// Usually not used directly.
 pub fn tokenize_str(text: &'_ str) -> Result<Tokens<'_>, TokenizationError> {
     Tokenizer::new(text).tokenize()
 }
@@ -645,6 +649,7 @@ pub fn tokenize_rt_str(text: &'_ str) -> Result<Tokens<'_>, TokenizationError> {
     Tokenizer::with_configuration(text, config).tokenize()
 }
 
+/// Tokenize bytes to [Tokens]
 pub fn tokenize_bytes(bytes: &'_ [u8]) -> Result<Tokens<'_>, TokenizationError> {
     let maybe_text = std::str::from_utf8(bytes);
     match maybe_text {

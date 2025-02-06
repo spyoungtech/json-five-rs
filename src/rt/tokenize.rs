@@ -9,14 +9,56 @@ pub struct TokenContext {
     pub end_byte_offset: usize,
 }
 
+/// Represents a source token
+///
+/// Unlike the spans found in [crate::tokenize::Tokens], these tokens are
+/// of an owned type containing an owned String of the lexeme from source.
+///
+/// The typical way to obtain a [Token] is from the [source_to_tokens] function. But
+/// tokens can be created without source documents, too.
+///
+///
 #[derive(Debug, PartialEq, Clone)]
 pub struct Token {
+    /// The contents of the token, exactly as it appears in source
     pub lexeme: String,
+
+    /// the type of the token
     pub tok_type: TokType,
+
+    /// Contextual information about the Token's position in the source document (if available)
+    /// Because tokens can be created without a source doc, this field is an [Option] and may be [None].
     pub context: Option<TokenContext>
 }
 
-
+/// Generate a Vec of [Token]s from a str.
+///
+///
+/// This function is complementary with [tokens_to_source]. The typical workflow
+/// is to use this function to generate a Vec of tokens, do something to modify it (
+/// e.g., add/remove/replace tokens) then use [tokens_to_source] to turn it back into JSON5 source.
+///
+/// Unlike the tokenizing functions available in the [crate::tokenize] module, this function
+/// produces owned [Token] objects containing (among other fields) an owned String of the lexeme,
+/// rather than a [crate::tokenize::Tokens] struct.
+///
+/// # Examples
+///
+/// ```rust
+/// use json_five::{source_to_tokens, tokens_to_source};
+/// use json_five::rt::tokenize::Token;
+/// use json_five::tokenize::TokType::Whitespace;
+///
+/// let tokens = source_to_tokens("  {my: 'json5'}  ").unwrap();
+///
+/// // remove all Whitespace tokens
+/// let new_tokens:Vec<Token> = tokens.into_iter().filter(|tok| tok.tok_type != Whitespace).collect();
+///
+/// // turn tokens back into source
+/// let new_source = tokens_to_source(&new_tokens);
+/// assert_eq!(new_source, String::from("{my:'json5'}"))
+/// ```
+///
 pub fn source_to_tokens(text: &str) -> Result<Vec<Token>, TokenizationError> {
     use crate::tokenize::tokenize_rt_str;
     // TODO: instead of going through the entire input to get the tokens
@@ -113,7 +155,29 @@ pub fn source_to_tokens(text: &str) -> Result<Vec<Token>, TokenizationError> {
     unreachable!("Unexpected end of document");
 }
 
-
+/// Generate a String from a Vec of [Token]s
+///
+/// This function is complementary with [source_to_tokens]. The typical workflow
+/// is to use [source_to_tokens] to generate a Vec of tokens, do something to modify it (
+/// e.g., add/remove/replace tokens) then use this function to turn it back into JSON5 source.
+///
+///
+/// # Examples
+///
+/// ```rust
+/// use json_five::{source_to_tokens, tokens_to_source};
+/// use json_five::rt::tokenize::Token;
+/// use json_five::tokenize::TokType::Whitespace;
+///
+/// let tokens = source_to_tokens("  {my: 'json5'}  ").unwrap();
+///
+/// // remove all Whitespace tokens
+/// let new_tokens:Vec<Token> = tokens.into_iter().filter(|tok| tok.tok_type != Whitespace).collect();
+///
+/// // turn tokens back into source
+/// let new_source = tokens_to_source(&new_tokens);
+/// assert_eq!(new_source, String::from("{my:'json5'}"))
+/// ```
 pub fn tokens_to_source(tokens: &Vec<Token>) -> String {
     let mut size = 0_usize;
     for tok in tokens.iter() {

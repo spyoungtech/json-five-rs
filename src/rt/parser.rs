@@ -21,16 +21,22 @@ impl Display for UnaryOperator {
 type Wsc = String; // Whitespace and comment tokens
 
 // {wsc.0} value {wsc.1}
+
+/// Represents contextual whitespace/comments for the associated JSONText
 #[derive(PartialEq, Debug, Clone)]
 pub struct JSONTextContext {
-    wsc: (Wsc, Wsc)
+    /// the whitespace and/or comments surrounding the Text production
+    ///
+    /// In other words: `{ wsc.0 } value { wsc.1 }`
+    pub wsc: (Wsc, Wsc)
 }
 
 // LBRACE {wsc} [ key_value_pairs ] RBRACE
 //                                 ^ any whitespace that would go here would be part of the KVP
+
 #[derive(PartialEq, Debug, Clone)]
 pub struct JSONObjectContext {
-    wsc: (Wsc,)
+    pub wsc: (Wsc,)
 }
 
 
@@ -41,54 +47,133 @@ pub struct KeyValuePairContext {
     //                       ^ Some() here represents the presence of a comma and its subsequent wsc
 }
 
-// LBRACKET {wsc.0} [ array_values ] RBRACKET
+
 #[derive(PartialEq, Debug, Clone)]
 pub struct JSONArrayContext {
+    /// Holds the whitespace/comments that follow the opening bracket of a [JSONValue::JSONArray]
+    ///
+    /// ```LBRACKET {wsc.0} [ array_values ] RBRACKET```
     pub wsc: (Wsc,)
 }
 
-// value {wsc.0} [ COMMA {wsc.1} ] [ next_value ]
 #[derive(PartialEq, Debug, Clone)]
 pub struct ArrayValueContext {
+    /// the whitespace and/or comments that may occur after the value and (optionally) after the comma following the value.
+    /// In other words, roughly:
+    /// ```ebnf
+    /// value { wsc.0 } [ COMMA { wsc.1 } [ next_value ]]
+    /// ```
     pub wsc: (Wsc, Option<Wsc>),
     //             ^ Some() here represents the presence of a comma and its subsequent wsc
 }
 
+/// Represents the ['JSON5Member' production](https://spec.json5.org/#prod-JSON5Member).
+///
+/// In other words, it's the key-value pairs of a [JSONValue::JSONObject]
 #[derive(PartialEq, Debug, Clone)]
 pub struct JSONKeyValuePair {
+
+    /// a `JSONValue`, in practice, is limited to [JSONValue::Identifier],
+    /// [JSONValue::DoubleQuotedString] or a [JSONValue::SingleQuotedString]
     pub key: JSONValue,
     pub value: JSONValue,
+
+    ///
     pub context: Option<KeyValuePairContext>
 }
 
+/// Represents a value in a [JSONValue::JSONArray]
 #[derive(PartialEq, Debug, Clone)]
 pub struct JSONArrayValue {
     pub value: JSONValue,
     pub context: Option<ArrayValueContext>
 }
 
-
+/// Represents a JSON5 value
+///
+/// Where these enum members have `String`s, they represent the object as it was tokenized without any modifications (that
+/// is, for example, without any escape sequences un-escaped). The single- and double-quoted `String`s do not include the surrounding
+/// quote characters. The [JSONValue::JSONObject]
 #[derive(PartialEq, Debug, Clone)]
 pub enum JSONValue {
-    JSONObject { key_value_pairs: Vec<JSONKeyValuePair>, context: Option<JSONObjectContext> },
-    JSONArray { values: Vec<JSONArrayValue>, context: Option<JSONArrayContext> },
+    /// Represents a JSON5 Object
+    JSONObject {
+
+        /// The key-value pairs of the object
+        key_value_pairs: Vec<JSONKeyValuePair>,
+
+        context: Option<JSONObjectContext>
+    },
+
+    /// Represents a JSON5 Array.
+    JSONArray {
+
+        values: Vec<JSONArrayValue>,
+
+        context: Option<JSONArrayContext>
+    },
+
+    /// Represents an Integer value.
+    /// The String value is a literal, as it might appear in JSON5 source
     Integer(String),
+
+    /// Represents a float value (not including NaN or Infinity, use [JSONValue::NaN] or [JSONValue::Infinity])
+    /// The String value is a literal as it might appear in JSON5 source
     Float(String),
+
+    /// Represents an exponent value
+    /// The String value is a literal as it might appear in JSON5 source
     Exponent(String),
+
+
     Null,
     Infinity,
     NaN,
+
+    /// Represents a hexadecimal value
+    /// The String value is a literal as it might appear in JSON5 source e.g. `String::from("0xDEADBEEF")`
     Hexadecimal(String),
     Bool(bool),
+
+    /// Double-quoted string, as it appears in source.
+    /// The String value does not include surrounding quotes
     DoubleQuotedString(String),
+
+    /// Single-quoted string, as it appears in source.
+    /// The String value does not include surrounding quotes
     SingleQuotedString(String),
+
+    /// Represents a unary production
     Unary { operator: UnaryOperator, value: Box<JSONValue> },
+
+    /// Represents unquoted identifiers.
+    ///
+    /// Uniquely, a [JSONValue::Identifier] can only be used in dictionary keys.
     Identifier(String), // XXX: for keys only!
 }
 
+
+/// Represents the top-level Text production of a JSON5 document.
+///
+///
+/// ```rust
+/// use json_five::rt::parser::from_str;
+/// use json_five::rt::parser::JSONValue;
+///
+/// let doc = from_str(" 'foo'\n").unwrap();
+/// let context = doc.context.unwrap();
+///
+/// assert_eq!(&context.wsc.0, " ");
+/// assert_eq!(doc.value, JSONValue::SingleQuotedString("foo".to_string()));
+/// assert_eq!(&context.wsc.1, "\n");
+/// ```
 #[derive(PartialEq, Debug)]
 pub struct JSONText {
+
+    /// Can be any [JSONValue] except for [JSONValue::Identifier] (which is reserved for keys only)
     pub value: JSONValue,
+
+    /// Contextual whitespace
     pub context: Option<JSONTextContext>
 }
 

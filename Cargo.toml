@@ -1,6 +1,6 @@
 [package]
 name = "json-five"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MIT"
 description = "JSON5 parser with round-trip capabilities and compatible with the serde data model"
@@ -25,7 +25,20 @@ features = ["derive"]
 criterion = { version="0.5" }
 serde_json = "1.0"
 json5 = "0.4.1"
+regex = "1"
 
 [[bench]]
 name = "bench_compare"
 harness = false
+
+[[example]]
+crate-type = ["bin"]
+path = "examples/json5-doublequote-fixer/src/main.rs"
+name = "json5-doublequote-fixer"
+test = true
+
+[[example]]
+crate-type = ["bin"]
+path = "examples/json5-trailing-comma-formatter/src/main.rs"
+name = "json5-trailing-comma-formatter"
+test = true

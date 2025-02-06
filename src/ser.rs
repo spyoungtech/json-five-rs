@@ -25,6 +25,7 @@ impl ser::Error for SerdeJSON5Error {
 
 use crate::parser::StyleConfiguration;
 
+/// The JSON5 serializer implementing [ser::Serializer]
 pub struct Serializer {
     // This string starts empty and JSON is appended as values are serialized.
     output: String,
@@ -33,12 +34,26 @@ pub struct Serializer {
 
 type Result<T> = std::result::Result<T, SerdeJSON5Error>;
 
-// By convention, the public API of a Serde serializer is one or more `to_abc`
-// functions such as `to_string`, `to_bytes`, or `to_writer` depending on what
-// Rust types the serializer is able to produce as output.
-//
-// This basic serializer supports only `to_string`.
-
+/// Basic helper to serialize a value implementing [Serialize] to a `String`
+///
+/// # Examples
+///
+/// ```rust
+/// use serde::Serialize;
+/// use json_five::to_string;
+/// #[derive(Serialize)]
+/// struct Test {
+///     int: u32,
+///     seq: Vec<&'static str>,
+/// }
+///
+/// let test = Test {
+///     int: 1,
+///     seq: vec!["a", "b"],
+/// };
+/// let expected = r#"{"int": 1, "seq": ["a", "b"]}"#;
+/// assert_eq!(to_string(&test).unwrap(), expected);
+/// ```
 pub fn to_string<T>(value: &T) -> Result<String>
 where
     T: Serialize,

@@ -42,7 +42,7 @@ pub enum JSONValue<'input> {
 
 #[derive(PartialEq, Debug)]
 pub struct JSONText<'input> {
-    pub(crate) value: JSONValue<'input>,
+    pub value: JSONValue<'input>,
 }
 
 #[allow(dead_code)]
@@ -537,11 +537,27 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
     }
 }
 
+
+/// Like [from_str] but for [Tokens]
 pub fn from_tokens<'toks, 'input>(tokens: &'toks Tokens<'input>) -> Result<JSONText<'input>, ParsingError> {
     let mut parser = JSON5Parser::new(tokens);
     parser.parse_text()
 }
 
+/// Turn a str input into the [JSONText] abstract JSON5 model
+///
+/// Not to be confused with [crate::de::from_str]. This typically is not used directly. Instead,
+/// most of the time when you want to work with AST, you probably want to use the
+/// functions provided in the [crate::rt] module instead.
+///
+/// ```rust
+/// use json_five::parser::{from_str, JSONText, JSONValue};
+///
+/// let res = from_str("{}").unwrap();
+/// let expected = JSONText{value: JSONValue::JSONObject {key_value_pairs: vec![]}};
+/// assert_eq!(res, expected)
+/// ```
+///
 pub fn from_str<'input>(source: &'input str) -> Result<JSONText<'input>, ParsingError> {
     use crate::tokenize::tokenize_str;
     let maybe_toks = tokenize_str(source);

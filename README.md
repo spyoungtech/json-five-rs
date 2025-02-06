@@ -2,7 +2,7 @@
 
 This project provides a handwritten JSON5 tokenizer and recursive descent parser compatible with `serde`.
 
-![Crates.io Version](https://img.shields.io/crates/v/json-five)
+[![Crates.io Version](https://img.shields.io/crates/v/json-five)](https://crates.io/crates/json-five/) [![docs.rs](https://img.shields.io/docsrs/json-five)]()
 
 # Key Features
 
@@ -20,7 +20,7 @@ You can use this lib with `serde` in the typical way:
 ```rust
 use json_five::from_str;
 use serde::Deserialize;
-#[derive(Debug, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize)]
 struct MyData {
     name: String,
     count: i64,
@@ -38,9 +38,8 @@ fn main() {
 "#;
 
     let parsed = from_str::<MyData>(source).unwrap();
-
-    println!("Parsed data: {:?}", parsed);
-    // Parsed data: MyData { name: "Hello", count: 42, maybe: Some(NaN) }
+    let expected = MyData {name: "Hello".to_string(), count: 42, maybe: Some(NaN)}
+    assert_eq!(parsed, expected)
 }
 ```
 ## Examples
@@ -103,10 +102,15 @@ field contains the context struct containing the `wsc` field, a two-length tuple
 In other words: `{ wsc.0 } value { wsc.1 }`
 
 ```rust
-// let doc: JSONText;
-doc.context.wsc.0 // any whitespace or comments (as a single string) before the value
-doc.value // a JSONValue
-doc.context.wsc.1 // any whitespace or comments after the value
+use json_five::rt::parser::from_str;
+use json_five::rt::parser::JSONValue;
+
+let doc = from_str(" 'foo'\n").unwrap();
+let context = doc.context.unwrap();
+
+assert_eq!(&context.wsc.0, " ");
+assert_eq!(doc.value, JSONValue::SingleQuotedString("foo".to_string()));
+assert_eq!(&context.wsc.1, "\n");
 ```
 
 
@@ -246,6 +250,7 @@ Some things I need to implement and some things I may or may not implement. In r
 
 - [ ] Move documentation from readme to crate documentation
 - [ ] Provide methods for safely editing models (e.g., validate that, when serialized, the model will produce a valid JSON5 document) today. This may also let us adjust the visibility of certain attributes.
+- [ ] Provide a `json5!` macro similar to `serde_json`'s [`json!` macro](https://docs.rs/serde_json/latest/serde_json/value/index.html)
 - [ ] Investigate `no_std` support
 - [ ] Optimize the round-trip tokenizer to avoid processing the input twice
 - [ ] More serialization formatting options (e.g., prefer single- or double-quoted strings, try to use identifiers where possible, etc.)

@@ -64,8 +64,7 @@ fn format_str(source: &str) -> String {
     model.to_string()
 }
 
-fn main() {
-    let doc = r#"// My Document
+const DOC: &str = r#"// My Document
 {
     breakfast: [
         'bacon',
@@ -76,6 +75,24 @@ fn main() {
         nested: "value" // <-- and here
     } // <--- and here
 }"#;
-    println!("{}", format_str(doc));
 
+fn main() {
+    println!("{}", format_str(DOC));
+}
+
+#[test]
+fn test() {
+    let res = format_str(DOC);
+    let expected = String::from(r#"// My Document
+{
+    breakfast: [
+        bacon,
+        eggs,
+        spam,  // <-- a trailing comma will be added here
+    ],
+    objekt: {
+        nested: value, // <-- and here
+    }, // <--- and here
+}"#);
+    assert_eq!(res, expected)
 }

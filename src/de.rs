@@ -525,7 +525,40 @@ impl<'de, 'a> VariantAccess<'de> for JSONValueDeserializer<'a> {
     }
 }
 
-/// Finally, define a convenience from_str for your custom format:
+/// Deserialize str to your values/structs/etc. compatible with the serde data model
+///
+///
+/// # Examples
+///
+/// ```rust
+/// use json_five::from_str;
+/// use serde::Deserialize;
+/// #[derive(Debug, PartialEq, Deserialize)]
+/// struct MyData {
+///     name: String,
+///     count: i64,
+///     maybe: Option<f64>,
+/// }
+///
+/// fn main() {
+///     let source = r#"
+///     // A possible JSON5 input
+///     {
+///       name: 'Hello',
+///       count: 42,
+///       maybe: null
+///     }
+/// "#;
+///
+///     let parsed = from_str::<MyData>(source).unwrap();
+///     let expected = MyData {name: "Hello".to_string(), count: 42, maybe: None};
+///     assert_eq!(parsed, expected);
+/// }
+/// ```
+///
+/// For convenience in dealing with arbitrary valid JSON5 documents, you may use `serde_json`'s [`Value` enum](https://docs.rs/serde_json/latest/serde_json/enum.Value.html).
+/// with this crate. This may be something implemented or vendored into `json-five` in the future.
+///
 pub fn from_str<'de, T>(s: &'de str) -> Result<T, SerdeJSON5Error>
 where
     T: Deserialize<'de>,
