@@ -364,7 +364,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                     TokType::Name => {
                         Ok(JSONValue::Identifier(lexeme))
                     }
-                    _ => panic!("Programming error. Please report this as a bug")
+                    _ => unreachable!("Programming error. Please report this as a bug")
                 }
             }
         }
@@ -499,7 +499,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                         }
                         Ok(JSONValue::Unary {operator: UnaryOperator::Minus, value: Box::new(value)})
                     }
-                    _ => panic!("no")
+                    _ => unreachable!("no")
                 }
             }
         }
@@ -512,7 +512,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                 match span.1 {
                     TokType::LeftBrace => self.parse_object(),
                     TokType::LeftBracket => self.parse_array(),
-                    _ => panic!("no")
+                    _ => unreachable!("no")
                 }
             }
         }
