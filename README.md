@@ -2,7 +2,7 @@
 
 This project provides a handwritten JSON5 tokenizer and recursive descent parser compatible with `serde`.
 
-[![Crates.io Version](https://img.shields.io/crates/v/json-five)](https://crates.io/crates/json-five/) [![docs.rs](https://img.shields.io/docsrs/json-five)]()
+[![Crates.io Version](https://img.shields.io/crates/v/json-five)](https://crates.io/crates/json-five/) [![docs.rs](https://img.shields.io/docsrs/json-five)](https://docs.rs/json-five/latest/json_five/)
 
 # Key Features
 
