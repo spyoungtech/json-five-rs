@@ -243,21 +243,3 @@ and may only need to rely on the tokenizer and/or AST tree features. By default,
 but this can be disabled. Even without the `serde` feature, the parser modules provide functions and methods for 
 parsing and serialization, including the ability to customize the style.
 
-
-## TODOs
-
-Some things I need to implement and some things I may or may not implement. In rough priority order:
-
-- [ ] Move documentation from readme to crate documentation
-- [ ] Provide methods for safely editing models (e.g., validate that, when serialized, the model will produce a valid JSON5 document) today. This may also let us adjust the visibility of certain attributes.
-- [ ] Provide a `json5!` macro similar to `serde_json`'s [`json!` macro](https://docs.rs/serde_json/latest/serde_json/value/index.html)
-- [ ] Investigate `no_std` support
-- [ ] Optimize the round-trip tokenizer to avoid processing the input twice
-- [ ] More serialization formatting options (e.g., prefer single- or double-quoted strings, try to use identifiers where possible, etc.)
-- [ ] Incremental parsing. Originally, an incremental tokenizer/parser was actually developed. In testing, speeds were the same or worse. Maybe it could be done in a performant way. But this may be useful for specific use cases, such as memory-constrained environments, very large JSON5 files (why?), or use cases where the input is streamed (say, over the network).
-- [x] ~~Publish crate~~
-- [x] ~~Benchmarks~~
-- [x] ~~Basic formatting options (indent, compact, trailing comma)~~
-- [x] ~~Complete logic for serialization of values (specifically: processing all \[unicode\] escape sequences in strings/identifiers and handling certain float formats like `.0` and `1.`)~~
-- [x] ~~Come up with a way to reject invalid unicode escape sequences (e.g., when an illegal escape sequence is used at the start of an identifier)~~
-- [ ] ~~Validate correctness of the tokenizer (specifically: use of `is_alphabetic` may not comport with the JSON5 spec)~~
