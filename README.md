@@ -62,17 +62,17 @@ expect performance to improve, if at least marginally, in the future.
 
 These benchmarks were run on Windows on an i9-10900K. This table won't be updated unless significant changes happen.
 
-|      test     |   json_five   |   serde_json  | json5         |
-|---------------|---------------|---------------|---------------|
-|      big      |   580.31 ms   |   150.39 ms   | 3.0861 s      |
-|     empty     |   228.62 ns   |   38.786 ns   | 708.00 ns     |
-|  medium-ascii |   199.88 ms   |   59.008 ms   | 706.94 ms     |
-|     arrays    |   578.24 ns   |   100.95 ns   | 1.3228 µs     |
-|    objects    |   922.91 ns   |   205.75 ns   | 2.0748 µs     |
-|  nested-array |   22.990 µs   |   5.0483 µs   | 29.356 µs     |
-| nested-objects|   50.659 µs   |   14.755 µs   | 132.75 µs     |
-|     string    |   421.17 ns   |   91.051 ns   | 3.5691 µs     |
-|     number    |   238.75 ns   |   36.179 ns   | 779.13 ns     |
+| test               |   json_five   |   serde_json  | json5         |
+|--------------------|---------------|---------------|---------------|
+| big (25MB)         |   580.31 ms   |   150.39 ms   | 3.0861 s      |
+| medium-ascii (5MB) |   199.88 ms   |   59.008 ms   | 706.94 ms     |
+| empty              |   228.62 ns   |   38.786 ns   | 708.00 ns     |
+| arrays             |   578.24 ns   |   100.95 ns   | 1.3228 µs     |
+| objects            |   922.91 ns   |   205.75 ns   | 2.0748 µs     |
+| nested-array       |   22.990 µs   |   5.0483 µs   | 29.356 µs     |
+| nested-objects     |   50.659 µs   |   14.755 µs   | 132.75 µs     |
+| string             |   421.17 ns   |   91.051 ns   | 3.5691 µs     |
+| number             |   238.75 ns   |   36.179 ns   | 779.13 ns     |
 
 
 
