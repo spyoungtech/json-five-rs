@@ -369,11 +369,10 @@ impl<'a> ser::SerializeSeq for &'a mut Serializer {
     {
         if !self.output.ends_with('[') {
             match self.style.indent {
-                Some(ident) => {
+                Some(_) => {
+                    self.output.reserve(self.style.current_indent.len() + 2);
                     self.output += ",\n";
-                    for _ in 0..ident {
-                        self.output.push(' ')
-                    }
+                    self.output.push_str(self.style.current_indent.as_str());
                 }
                 None => {
                     self.output.push_str(self.style.item_separator.as_str())
@@ -383,10 +382,11 @@ impl<'a> ser::SerializeSeq for &'a mut Serializer {
             match self.style.indent {
                 Some(ident) => {
                     self.output.push('\n');
-                    self.style.current_indent += ident;
-                    for _ in 0 .. self.style.current_indent {
-                        self.output.push(' ')
+                    self.style.current_indent.reserve(ident);
+                    for _ in 0 .. ident {
+                        self.style.current_indent.push(' ');
                     }
+                    self.output.push_str(self.style.current_indent.as_str());
                 }
                 None => {}
             }
@@ -404,11 +404,10 @@ impl<'a> ser::SerializeSeq for &'a mut Serializer {
         }
         match self.style.indent {
             Some(ident) => {
-                self.style.current_indent -= ident;
+                self.style.current_indent.truncate(self.style.current_indent.len() - ident);
+                self.output.reserve(self.style.current_indent.len() + 1);
                 self.output.push('\n');
-                for _ in 0 .. self.style.current_indent {
-                    self.output.push(' ');
-                }
+                self.output.push_str(self.style.current_indent.as_str());
             }
             None => {}
         }
@@ -428,11 +427,10 @@ impl<'a> ser::SerializeTuple for &'a mut Serializer {
     {
         if !self.output.ends_with('[') {
             match self.style.indent {
-                Some(ident) => {
+                Some(_) => {
+                    self.output.reserve(self.style.current_indent.len() + 2);
                     self.output += ",\n";
-                    for _ in 0..ident {
-                        self.output.push(' ')
-                    }
+                    self.output.push_str(self.style.current_indent.as_str());
                 }
                 None => {
                     self.output.push_str(self.style.item_separator.as_str())
@@ -442,10 +440,11 @@ impl<'a> ser::SerializeTuple for &'a mut Serializer {
             match self.style.indent {
                 Some(ident) => {
                     self.output.push('\n');
-                    self.style.current_indent += ident;
-                    for _ in 0 .. self.style.current_indent {
-                        self.output.push(' ')
+                    self.style.current_indent.reserve(ident);
+                    for _ in 0 .. ident {
+                        self.style.current_indent.push(' ');
                     }
+                    self.output.push_str(self.style.current_indent.as_str());
                 }
                 None => {}
             }
@@ -462,11 +461,10 @@ impl<'a> ser::SerializeTuple for &'a mut Serializer {
         }
         match self.style.indent {
             Some(ident) => {
-                self.style.current_indent -= ident;
+                self.style.current_indent.truncate(self.style.current_indent.len() - ident);
+                self.output.reserve(self.style.current_indent.len() + 1);
                 self.output.push('\n');
-                for _ in 0 .. self.style.current_indent {
-                    self.output.push(' ');
-                }
+                self.output.push_str(self.style.current_indent.as_str());
             }
             None => {}
         }
@@ -486,11 +484,10 @@ impl<'a> ser::SerializeTupleStruct for &'a mut Serializer {
     {
         if !self.output.ends_with('[') {
             match self.style.indent {
-                Some(ident) => {
+                Some(_) => {
+                    self.output.reserve(self.style.current_indent.len() + 2);
                     self.output += ",\n";
-                    for _ in 0..ident {
-                        self.output.push(' ')
-                    }
+                    self.output.push_str(self.style.current_indent.as_str());
                 }
                 None => {
                     self.output.push_str(self.style.item_separator.as_str())
@@ -500,10 +497,11 @@ impl<'a> ser::SerializeTupleStruct for &'a mut Serializer {
             match self.style.indent {
                 Some(ident) => {
                     self.output.push('\n');
-                    self.style.current_indent += ident;
-                    for _ in 0 .. self.style.current_indent {
-                        self.output.push(' ')
+                    self.style.current_indent.reserve(ident);
+                    for _ in 0 .. ident {
+                        self.style.current_indent.push(' ');
                     }
+                    self.output.push_str(self.style.current_indent.as_str());
                 }
                 None => {}
             }
@@ -520,11 +518,10 @@ impl<'a> ser::SerializeTupleStruct for &'a mut Serializer {
         }
         match self.style.indent {
             Some(ident) => {
-                self.style.current_indent -= ident;
+                self.style.current_indent.truncate(self.style.current_indent.len() - ident);
+                self.output.reserve(self.style.current_indent.len() + 1);
                 self.output.push('\n');
-                for _ in 0 .. self.style.current_indent {
-                    self.output.push(' ');
-                }
+                self.output.push_str(self.style.current_indent.as_str());
             }
             None => {}
         }
@@ -552,11 +549,10 @@ impl<'a> ser::SerializeTupleVariant for &'a mut Serializer {
     {
         if !self.output.ends_with('[') {
             match self.style.indent {
-                Some(ident) => {
+                Some(_) => {
+                    self.output.reserve(self.style.current_indent.len() + 2);
                     self.output += ",\n";
-                    for _ in 0..ident {
-                        self.output.push(' ')
-                    }
+                    self.output.push_str(self.style.current_indent.as_str());
                 }
                 None => {
                     self.output.push_str(self.style.item_separator.as_str())
@@ -566,10 +562,11 @@ impl<'a> ser::SerializeTupleVariant for &'a mut Serializer {
             match self.style.indent {
                 Some(ident) => {
                     self.output.push('\n');
-                    self.style.current_indent += ident;
-                    for _ in 0 .. self.style.current_indent {
-                        self.output.push(' ')
+                    self.style.current_indent.reserve(ident);
+                    for _ in 0 .. ident {
+                        self.style.current_indent.push(' ');
                     }
+                    self.output.push_str(self.style.current_indent.as_str());
                 }
                 None => {}
             }
@@ -586,11 +583,10 @@ impl<'a> ser::SerializeTupleVariant for &'a mut Serializer {
         }
         match self.style.indent {
             Some(ident) => {
-                self.style.current_indent -= ident;
+                self.style.current_indent.truncate(self.style.current_indent.len() - ident);
+                self.output.reserve(self.style.current_indent.len() + 1);
                 self.output.push('\n');
-                for _ in 0 .. self.style.current_indent {
-                    self.output.push(' ');
-                }
+                self.output.push_str(self.style.current_indent.as_str());
             }
             None => {}
         }
@@ -603,11 +599,10 @@ impl<'a> ser::SerializeTupleVariant for &'a mut Serializer {
         }
         match self.style.indent {
             Some(ident) => {
-                self.style.current_indent -= ident;
+                self.style.current_indent.truncate(self.style.current_indent.len() - ident);
+                self.output.reserve(self.style.current_indent.len() + 1);
                 self.output.push('\n');
-                for _ in 0 .. self.style.current_indent {
-                    self.output.push(' ');
-                }
+                self.output.push_str(self.style.current_indent.as_str());
             }
             None => {}
         }
@@ -642,11 +637,10 @@ impl<'a> ser::SerializeMap for &'a mut Serializer {
     {
         if !self.output.ends_with('{') {
             match self.style.indent {
-                Some(ident) => {
+                Some(_) => {
+                    self.output.reserve(self.style.current_indent.len() + 2);
                     self.output += ",\n";
-                    for _ in 0..ident {
-                        self.output.push(' ')
-                    }
+                    self.output.push_str(self.style.current_indent.as_str());
                 }
                 None => {
                     self.output.push_str(self.style.item_separator.as_str())
@@ -656,10 +650,11 @@ impl<'a> ser::SerializeMap for &'a mut Serializer {
             match self.style.indent {
                 Some(ident) => {
                     self.output.push('\n');
-                    self.style.current_indent += ident;
-                    for _ in 0 .. self.style.current_indent {
-                        self.output.push(' ')
+                    self.style.current_indent.reserve(ident);
+                    for _ in 0 .. ident {
+                        self.style.current_indent.push(' ');
                     }
+                    self.output.push_str(self.style.current_indent.as_str());
                 }
                 None => {}
             }
@@ -687,11 +682,10 @@ impl<'a> ser::SerializeMap for &'a mut Serializer {
         }
         match self.style.indent {
             Some(ident) => {
-                self.style.current_indent -= ident;
+                self.style.current_indent.truncate(self.style.current_indent.len() - ident);
+                self.output.reserve(self.style.current_indent.len() + 1);
                 self.output.push('\n');
-                for _ in 0 .. self.style.current_indent {
-                    self.output.push(' ');
-                }
+                self.output.push_str(self.style.current_indent.as_str());
             }
             None => {}
         }
@@ -712,11 +706,10 @@ impl<'a> ser::SerializeStruct for &'a mut Serializer {
     {
         if !self.output.ends_with('{') {
             match self.style.indent {
-                Some(ident) => {
+                Some(_) => {
+                    self.output.reserve(self.style.current_indent.len() + 2);
                     self.output += ",\n";
-                    for _ in 0..ident {
-                        self.output.push(' ')
-                    }
+                    self.output.push_str(self.style.current_indent.as_str());
                 }
                 None => {
                     self.output.push_str(self.style.item_separator.as_str())
@@ -726,10 +719,11 @@ impl<'a> ser::SerializeStruct for &'a mut Serializer {
             match self.style.indent {
                 Some(ident) => {
                     self.output.push('\n');
-                    self.style.current_indent += ident;
-                    for _ in 0 .. self.style.current_indent {
-                        self.output.push(' ')
+                    self.style.current_indent.reserve(ident);
+                    for _ in 0 .. ident {
+                        self.style.current_indent.push(' ');
                     }
+                    self.output.push_str(self.style.current_indent.as_str());
                 }
                 None => {}
             }
@@ -748,11 +742,10 @@ impl<'a> ser::SerializeStruct for &'a mut Serializer {
         }
         match self.style.indent {
             Some(ident) => {
-                self.style.current_indent -= ident;
+                self.style.current_indent.truncate(self.style.current_indent.len() - ident);
+                self.output.reserve(self.style.current_indent.len() + 1);
                 self.output.push('\n');
-                for _ in 0 .. self.style.current_indent {
-                    self.output.push(' ');
-                }
+                self.output.push_str(self.style.current_indent.as_str());
             }
             None => {}
         }
@@ -776,11 +769,10 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
     {
         if !self.output.ends_with('{') {
             match self.style.indent {
-                Some(ident) => {
+                Some(_) => {
+                    self.output.reserve(self.style.current_indent.len() + 2);
                     self.output += ",\n";
-                    for _ in 0..ident {
-                        self.output.push(' ')
-                    }
+                    self.output.push_str(self.style.current_indent.as_str());
                 }
                 None => {
                     self.output.push_str(self.style.item_separator.as_str())
@@ -790,10 +782,11 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
             match self.style.indent {
                 Some(ident) => {
                     self.output.push('\n');
-                    self.style.current_indent += ident;
-                    for _ in 0 .. self.style.current_indent {
-                        self.output.push(' ')
+                    self.style.current_indent.reserve(ident);
+                    for _ in 0 .. ident {
+                        self.style.current_indent.push(' ');
                     }
+                    self.output.push_str(self.style.current_indent.as_str());
                 }
                 None => {}
             }
@@ -812,11 +805,10 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
         }
         match self.style.indent {
             Some(ident) => {
-                self.style.current_indent -= ident;
+                self.style.current_indent.truncate(self.style.current_indent.len() - ident);
+                self.output.reserve(self.style.current_indent.len() + 1);
                 self.output.push('\n');
-                for _ in 0 .. self.style.current_indent {
-                    self.output.push(' ');
-                }
+                self.output.push_str(self.style.current_indent.as_str());
             }
             None => {}
         }
@@ -831,11 +823,10 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
         }
         match self.style.indent {
             Some(ident) => {
-                self.style.current_indent -= ident;
+                self.style.current_indent.truncate(self.style.current_indent.len() - ident);
+                self.output.reserve(self.style.current_indent.len() + 1);
                 self.output.push('\n');
-                for _ in 0 .. self.style.current_indent {
-                    self.output.push(' ');
-                }
+                self.output.push_str(self.style.current_indent.as_str());
             }
             None => {}
         }
@@ -844,47 +835,67 @@ impl<'a> ser::SerializeStructVariant for &'a mut Serializer {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
-#[test]
-fn test_struct() {
+#[cfg(test)]
+mod tests {
+    use super::*;
     #[derive(Serialize)]
     struct Test {
         int: u32,
         seq: Vec<&'static str>,
     }
 
-    let test = Test {
-        int: 1,
-        seq: vec!["a", "b"],
-    };
-    let expected = r#"{"int": 1, "seq": ["a", "b"]}"#;
-    assert_eq!(to_string(&test).unwrap(), expected);
-}
+    #[test]
+    fn test_struct() {
 
-#[test]
-fn test_enum() {
-    #[derive(Serialize)]
-    enum E {
-        Unit,
-        Newtype(u32),
-        Tuple(u32, u32),
-        Struct { a: u32 },
+        let test = Test {
+            int: 1,
+            seq: vec!["a", "b"],
+        };
+        let expected = r#"{"int": 1, "seq": ["a", "b"]}"#;
+        assert_eq!(to_string(&test).unwrap(), expected);
+    }
+    #[test]
+    fn test_struct_styled() {
+        let test = Test {
+            int: 1,
+            seq: vec!["a", "b"],
+        };
+        let expected = r#"{
+    "int": 1,
+    "seq": [
+        "a",
+        "b",
+    ],
+}"#;
+        let style = StyleConfiguration::with_indent(4, TrailingComma::ALL);
+        assert_eq!(to_string_styled(&test, style).unwrap(), expected);
     }
 
-    let u = E::Unit;
-    let expected = r#""Unit""#;
-    assert_eq!(to_string(&u).unwrap(), expected);
 
-    let n = E::Newtype(1);
-    let expected = r#"{"Newtype": 1}"#;
-    assert_eq!(to_string(&n).unwrap(), expected);
+    #[test]
+    fn test_enum() {
+        #[derive(Serialize)]
+        enum E {
+            Unit,
+            Newtype(u32),
+            Tuple(u32, u32),
+            Struct { a: u32 },
+        }
 
-    let t = E::Tuple(1, 2);
-    let expected = r#"{"Tuple": [1, 2]}"#;
-    assert_eq!(to_string(&t).unwrap(), expected);
+        let u = E::Unit;
+        let expected = r#""Unit""#;
+        assert_eq!(to_string(&u).unwrap(), expected);
 
-    let s = E::Struct { a: 1 };
-    let expected = r#"{"Struct": {"a": 1}}"#;
-    assert_eq!(to_string(&s).unwrap(), expected);
+        let n = E::Newtype(1);
+        let expected = r#"{"Newtype": 1}"#;
+        assert_eq!(to_string(&n).unwrap(), expected);
+
+        let t = E::Tuple(1, 2);
+        let expected = r#"{"Tuple": [1, 2]}"#;
+        assert_eq!(to_string(&t).unwrap(), expected);
+
+        let s = E::Struct { a: 1 };
+        let expected = r#"{"Struct": {"a": 1}}"#;
+        assert_eq!(to_string(&s).unwrap(), expected);
+    }
 }
