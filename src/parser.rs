@@ -57,26 +57,26 @@ pub struct StyleConfiguration {
     pub(crate) indent: Option<usize>,
     pub(crate) item_separator: String,
     pub(crate) key_separator: String,
-    pub(crate) current_indent: usize,
+    pub(crate) current_indent: String,
     pub(crate) trailing_comma: TrailingComma
 }
 
 #[allow(dead_code)]
 impl StyleConfiguration {
     pub fn new(indent: Option<usize>, item_separator: &str, key_separator: &str, trailing_comma: TrailingComma) -> Self {
-        StyleConfiguration{indent: indent, item_separator: item_separator.to_string(), key_separator: key_separator.to_string(), current_indent: 0, trailing_comma: trailing_comma}
+        StyleConfiguration{indent: indent, item_separator: item_separator.to_string(), key_separator: key_separator.to_string(), current_indent: String::with_capacity(64), trailing_comma: trailing_comma}
     }
 
     pub fn with_indent(indent: usize, trailing_comma: TrailingComma) -> Self {
-        StyleConfiguration{indent: Some(indent), item_separator: ",".to_string(), key_separator: ": ".to_string(), trailing_comma, current_indent: 0}
+        StyleConfiguration{indent: Some(indent), item_separator: ",".to_string(), key_separator: ": ".to_string(), trailing_comma, current_indent: String::with_capacity(64)}
     }
 
     pub fn with_separators(item_separator: &str, key_separator: &str, trailing_comma: TrailingComma) -> Self {
-        StyleConfiguration{indent: Some(0), key_separator: key_separator.to_string(), trailing_comma, item_separator: item_separator.to_string(), current_indent: 0}
+        StyleConfiguration{indent: Some(0), key_separator: key_separator.to_string(), trailing_comma, item_separator: item_separator.to_string(), current_indent: String::with_capacity(64)}
     }
 
     pub fn default() -> Self {
-        StyleConfiguration{indent: None, item_separator: ", ".to_string(), key_separator: ": ".to_string(), current_indent: 0, trailing_comma: TrailingComma::NONE}
+        StyleConfiguration{indent: None, item_separator: ", ".to_string(), key_separator: ": ".to_string(), current_indent: String::with_capacity(64), trailing_comma: TrailingComma::NONE}
 
     }
 }
@@ -123,7 +123,10 @@ impl<'input> JSONValue<'input> {
                         ret = String::from("{");
                     }
                     Some(ident) => {
-                        style.current_indent += ident;
+                        style.current_indent.reserve(ident);
+                        for _ in 0 .. ident {
+                            style.current_indent.push(' ');
+                        }
                         ret = format!("{{\n{}", style.current_indent);
                     }
                 }
@@ -151,7 +154,7 @@ impl<'input> JSONValue<'input> {
                         ret.push_str("}");
                     }
                     Some(ident) => {
-                        style.current_indent -= ident;
+                        style.current_indent.truncate(style.current_indent.len() - ident);
                         ret.push_str(format!("\n{}}}", style.current_indent).as_str());
                     }
                 }
@@ -165,7 +168,10 @@ impl<'input> JSONValue<'input> {
                         ret = String::from("[");
                     }
                     Some(ident) => {
-                        style.current_indent += ident;
+                        style.current_indent.reserve(ident);
+                        for _ in 0 .. ident {
+                            style.current_indent.push(' ');
+                        }
                         ret = format!("{{\n{}", style.current_indent);
                     }
                 }
@@ -193,7 +199,7 @@ impl<'input> JSONValue<'input> {
                         ret.push_str("]");
                     }
                     Some(ident) => {
-                        style.current_indent -= ident;
+                        style.current_indent.truncate(style.current_indent.len() - ident);
                         ret.push_str(format!("\n{}}}", style.current_indent).as_str());
                     }
                 }
