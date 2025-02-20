@@ -58,12 +58,16 @@ let test = Test {
     int: 1,
     seq: vec!["a", "b"],
 };
+
+let serialized = to_string(&test).unwrap();
+
 let expected = r#"{"int": 1, "seq": ["a", "b"]}"#;
-assert_eq!(to_string(&test).unwrap(), expected);
+assert_eq!(serialized, expected);
 ```
 
 You may also use the `to_string_formatted` with a `FormatConfiguration` to control the output format, including 
-indentation, trailing commas, and key/item separators.
+indentation, trailing commas, and key/item separators. A few useful constructors are available, including 
+`::compact()` for the most compact format (no whitespace).
 
 ```rust
 use serde::Serialize;
