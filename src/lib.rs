@@ -22,13 +22,16 @@ pub use de::{from_str, JSONValueDeserializer};
 
 /// the `serde` serializer
 #[cfg(feature = "serde")]
-pub use ser::{to_string, Serializer};
+pub use ser::{to_string, to_string_formatted, Serializer};
 
 /// turn your strings into abstract JSON5 model (AST)
 pub use parser::from_str as model_from_str;
 
 /// Turn [crate::tokenize::Tokens] into AST
 pub use parser::from_tokens as model_from_tokens;
+
+/// formatting configuration for use with [crate::to_string_formatted]
+pub use parser::FormatConfiguration;
 
 /// turn str/bytes into [crate::tokenize::Tokens]
 pub use tokenize::{tokenize_bytes, tokenize_str};
