@@ -96,6 +96,9 @@ let expected = r#"{
 assert_eq!(formatted_doc, expected);
 ```
 
+Tip: you may use `serde_json::Value` as a target type for deserializing arbitrary JSON5 documents. In the future 
+this crate may provide an equivalent type directly (or maybe vendor this).
+
 ## Examples
 
 See the `examples/` directory for examples of programs that utilize round-tripping features.
