@@ -1,7 +1,7 @@
 [package]
 name = "json-five"
 version = "0.2.1"
-edition = "2021"
+edition = "2024"
 license = "MIT"
 description = "JSON5 parser with round-trip capabilities and compatible with the serde data model"
 repository = "https://github.com/spyoungtech/json-five-rs"
