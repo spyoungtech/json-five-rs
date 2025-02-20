@@ -127,40 +127,16 @@ These benchmarks were run on Windows on an i9-10900K with rustc 1.83.0 (90b35a62
 | string                     | 421.17 ns | 3.5691 µs | 91.051 ns  |
 | number                     | 238.75 ns | 779.13 ns | 36.179 ns  |
 | deserialize (size 10)      | 6.9898µs  | 58.398µs  | 886.33ns   |
-| deserialize (size 10)      | 6.9898µs  | 58.398µs  | 886.33ns   |
-| deserialize (size 10)      | 6.9898µs  | 58.398µs  | 886.33ns   |
-| deserialize (size 100)     | 66.005µs  | 830.79µs  | 9.9705µs   |
-| deserialize (size 100)     | 66.005µs  | 830.79µs  | 9.9705µs   |
 | deserialize (size 100)     | 66.005µs  | 830.79µs  | 9.9705µs   |
 | deserialize (size 1000)    | 599.39µs  | 8.4952ms  | 69.110µs   |
-| deserialize (size 1000)    | 599.39µs  | 8.4952ms  | 69.110µs   |
-| deserialize (size 1000)    | 599.39µs  | 8.4952ms  | 69.110µs   |
-| deserialize (size 10000)   | 5.9841ms  | 82.591ms  | 734.40µs   |
-| deserialize (size 10000)   | 5.9841ms  | 82.591ms  | 734.40µs   |
 | deserialize (size 10000)   | 5.9841ms  | 82.591ms  | 734.40µs   |
 | deserialize (size 100000)  | 66.841ms  | 955.37ms  | 11.638ms   |
-| deserialize (size 100000)  | 66.841ms  | 955.37ms  | 11.638ms   |
-| deserialize (size 100000)  | 66.841ms  | 955.37ms  | 11.638ms   |
-| deserialize (size 1000000) | 674.13ms  | 9.5758s   | 119.03ms   |
-| deserialize (size 1000000) | 674.13ms  | 9.5758s   | 119.03ms   |
 | deserialize (size 1000000) | 674.13ms  | 9.5758s   | 119.03ms   |
 | serialize (size 10)        | 2.3496µs  | 48.915µs  | 891.85ns   |
-| serialize (size 10)        | 2.3496µs  | 48.915µs  | 891.85ns   |
-| serialize (size 10)        | 2.3496µs  | 48.915µs  | 891.85ns   |
-| serialize (size 100)       | 19.602µs  | 458.98µs  | 6.7109µs   |
-| serialize (size 100)       | 19.602µs  | 458.98µs  | 6.7109µs   |
 | serialize (size 100)       | 19.602µs  | 458.98µs  | 6.7109µs   |
 | serialize (size 1000)      | 194.19µs  | 4.6035ms  | 62.667µs   |
-| serialize (size 1000)      | 194.19µs  | 4.6035ms  | 62.667µs   |
-| serialize (size 1000)      | 194.19µs  | 4.6035ms  | 62.667µs   |
-| serialize (size 10000)     | 2.2104ms  | 47.253ms  | 761.10µs   |
-| serialize (size 10000)     | 2.2104ms  | 47.253ms  | 761.10µs   |
 | serialize (size 10000)     | 2.2104ms  | 47.253ms  | 761.10µs   |
 | serialize (size 100000)    | 24.418ms  | 502.35ms  | 11.410ms   |
-| serialize (size 100000)    | 24.418ms  | 502.35ms  | 11.410ms   |
-| serialize (size 100000)    | 24.418ms  | 502.35ms  | 11.410ms   |
-| serialize (size 1000000)   | 245.26ms  | 4.6211s   | 115.84ms   |
-| serialize (size 1000000)   | 245.26ms  | 4.6211s   | 115.84ms   |
 | serialize (size 1000000)   | 245.26ms  | 4.6211s   | 115.84ms   |
 
 
