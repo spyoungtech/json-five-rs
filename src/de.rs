@@ -362,7 +362,7 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
         // in user code.
         use serde::de::IntoDeserializer;
         match self.input {
-            JSONValue::Identifier(ident) => {
+            JSONValue::Identifier(ident) | JSONValue::SingleQuotedString(ident) | JSONValue::DoubleQuotedString(ident) => {
                 // We'll treat the entire enum as a single variant with no payload:
                 visitor.visit_enum(ident.into_deserializer())
             }
@@ -370,13 +370,11 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
                 // Possibly the first key is your variant, the value is the data.
                 // Example pattern for `Tag: { /* contents */ }` style
                 let kv = &key_value_pairs[0];
-                if let JSONValue::Identifier(ref variant) = kv.key {
-                    visitor.visit_enum(EnumDeserializer {
-                        variant,
-                        content: &kv.value,
-                    })
-                } else {
-                    Err(de::Error::custom("Invalid enum representation"))
+                match kv.key {
+                    JSONValue::Identifier(variant) | JSONValue::SingleQuotedString(variant) | JSONValue::DoubleQuotedString(variant) => {
+                        visitor.visit_enum(EnumDeserializer {variant, content: &kv.value})
+                    }
+                    _ => Err(de::Error::custom("Invalid enum representation"))
                 }
             }
             _ => Err(de::Error::custom("Unsupported enum representation")),
@@ -488,7 +486,13 @@ impl<'de, 'a> VariantAccess<'de> for JSONValueDeserializer<'a> {
 
     fn unit_variant(self) -> Result<(), Self::Error> {
         // If the variant is expected to have no value, do nothing:
-        Ok(())
+        match self.input {
+            JSONValue::Null => {Ok(())}
+            _ => {
+                Err(de::Error::custom("Unit variants must be null"))
+            }
+        }
+
     }
 
     fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
@@ -636,7 +640,7 @@ mod test {
 mod json5_compat_tests {
     use super::*; // Bring in your `from_str` parser.
     use std::collections::BTreeMap; // Or HashMap, if preferred.
-    use serde::Deserialize;
+    use serde::{Deserialize, Serialize};
 
     /// A minimal JSON5-like "value" type for testing.
     /// Adjust as needed for your parser’s feature set.
@@ -1165,5 +1169,35 @@ mod json5_compat_tests {
             MyValue::Object(map) => assert!(map.is_empty()),
             _ => panic!("Expected empty object after whitespace"),
         }
+    }
+
+    #[test]
+    fn test_gh_11() {
+        use crate::from_str;
+        #[derive(Debug, Clone, serde::Deserialize, Serialize, PartialEq)]
+        #[serde(rename_all="snake_case")]
+        enum SomeEnum{
+            VariantA(String),
+            VariantB,
+        }
+
+        #[derive(Debug, Clone, serde::Deserialize, Serialize)]
+        struct SomeStruct {
+            some_enum: SomeEnum
+        }
+
+
+        let json5 = r#"{some_enum: "variant_b" }"#;
+        let parsed: SomeStruct = from_str(json5).unwrap();
+        assert_eq!(parsed.some_enum, SomeEnum::VariantB);
+
+        let json5 = r#"{some_enum: {"variant_b": null} }"#;
+        let parsed: SomeStruct = from_str(json5).unwrap();
+        assert_eq!(parsed.some_enum, SomeEnum::VariantB);
+
+
+        let json5 = r#"{some_enum: { "variant_b": {} }}"#;
+        let maybe_res: Result<SomeStruct, _> = from_str(json5);
+        let err = maybe_res.unwrap_err();
     }
 }
