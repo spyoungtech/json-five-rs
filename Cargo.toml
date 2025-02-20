@@ -3,13 +3,13 @@ name = "json-five"
 version = "0.2.0"
 edition = "2021"
 license = "MIT"
-license-file = "LICENSE"
 description = "JSON5 parser with round-trip capabilities and compatible with the serde data model"
 repository = "https://github.com/spyoungtech/json-five-rs"
 readme = "README.md"
 keywords = ["serde", "json5", "json", "round-trip", "parser"]
 categories = ["parsing", "parser-implementations"]
-include = ["src/**/*.rs", "Cargo.toml"]
+include = ["src/**/*.rs", "Cargo.toml", "LICENSE"]
+
 
 [dependencies]
 serde = { version = "1.0", optional = true }
