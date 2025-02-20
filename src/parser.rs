@@ -78,6 +78,10 @@ impl FormatConfiguration {
     pub fn default() -> Self {
         FormatConfiguration {indent: None, item_separator: ", ".to_string(), key_separator: ": ".to_string(), current_indent: String::with_capacity(64), trailing_comma: TrailingComma::NONE}
     }
+
+    pub fn compact() -> Self {
+        FormatConfiguration {indent: None, item_separator: ",".to_string(), key_separator: ":".to_string(), current_indent: String::with_capacity(64), trailing_comma: TrailingComma::NONE}
+    }
 }
 
 impl<'input> JSONKeyValuePair<'input> {
