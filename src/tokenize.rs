@@ -547,7 +547,7 @@ impl <'input> Tokenizer<'input> {
         match maybe_next {
             None => {
                 match maybe_last {
-                    Some((last_idx, _)) => Ok((last_idx+1, TokType::EOF, last_idx+1)),
+                    Some((last_idx, last_char)) => Ok((last_idx + last_char.len_utf8(), TokType::EOF, last_idx + last_char.len_utf8())),
                     None => Ok((0, TokType::EOF, 0)),
                 }
             }
@@ -796,5 +796,14 @@ mod test {
         let toks = tokenize_str(text).unwrap();
         let expected = Tokens{source: text, tok_spans: vec![(0, LeftBrace, 1), (1, Name, 3), (3, Colon, 4), (4, Integer, 5), (5, Comma, 6), (6, Name, 8), (8, Colon, 9), (9, Integer, 10), (10, Comma, 11), (11, Name, 18), (18, Colon, 19), (19, Integer, 20), (20, RightBrace, 21), (21, EOF, 21)]};
         assert_eq!(toks, expected)
+    }
+
+    #[test]
+    fn test_eof_after_multibyte() {
+        let text = r#"ë"#;
+        let toks = tokenize_str(text).unwrap();
+        let expected = Tokens{source: text, tok_spans: vec![(0, Name, 2), (2, EOF, 2)]};
+        assert_eq!(toks, expected)
+
     }
 }
