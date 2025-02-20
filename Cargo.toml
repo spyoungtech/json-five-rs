@@ -31,6 +31,10 @@ regex = "1"
 name = "bench_compare"
 harness = false
 
+[[bench]]
+name = "bench_deserialize"
+harness = false
+
 [[example]]
 crate-type = ["bin"]
 path = "examples/json5-doublequote-fixer/src/main.rs"
