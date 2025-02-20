@@ -3,6 +3,7 @@ name = "json-five"
 version = "0.2.0"
 edition = "2021"
 license = "MIT"
+license-file = "LICENSE"
 description = "JSON5 parser with round-trip capabilities and compatible with the serde data model"
 repository = "https://github.com/spyoungtech/json-five-rs"
 readme = "README.md"
@@ -46,3 +47,6 @@ crate-type = ["bin"]
 path = "examples/json5-trailing-comma-formatter/src/main.rs"
 name = "json5-trailing-comma-formatter"
 test = true
+
+[package.metadata.docs.rs]
+all-features = true
