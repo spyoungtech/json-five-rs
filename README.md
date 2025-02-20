@@ -112,7 +112,7 @@ so that you don't skip the big benchmarks. The benchmarks compare `json_five` (t
 [serde_json](https://github.com/serde-rs/json) and [json5-rs](https://github.com/callum-oakley/json5-rs).
 
 Notwithstanding the general caveats of benchmarks, in initial testing, `json_five` definitively outperforms `json5-rs`.
-In typical scenarios observations have been 3-4x performance, and up to 20x faster in some synthetic tests on extremely large data. 
+In typical scenarios observations have been 3-4x performance, and up to 20x faster in some synthetic tests. 
 At time of writing (pre- v0) no performance optimizations have been done. I expect performance to improve, 
 if at least marginally, in the future.
 
