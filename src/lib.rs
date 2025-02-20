@@ -31,7 +31,7 @@ pub use parser::from_str as model_from_str;
 pub use parser::from_tokens as model_from_tokens;
 
 /// formatting configuration for use with [crate::to_string_formatted]
-pub use parser::FormatConfiguration;
+pub use parser::{FormatConfiguration, TrailingComma};
 
 /// turn str/bytes into [crate::tokenize::Tokens]
 pub use tokenize::{tokenize_bytes, tokenize_str};
