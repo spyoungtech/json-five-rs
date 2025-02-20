@@ -53,7 +53,7 @@ pub enum TrailingComma {
     NONE
 }
 
-pub struct StyleConfiguration {
+pub struct FormatConfiguration {
     pub(crate) indent: Option<usize>,
     pub(crate) item_separator: String,
     pub(crate) key_separator: String,
@@ -62,33 +62,36 @@ pub struct StyleConfiguration {
 }
 
 #[allow(dead_code)]
-impl StyleConfiguration {
+impl FormatConfiguration {
     pub fn new(indent: Option<usize>, item_separator: &str, key_separator: &str, trailing_comma: TrailingComma) -> Self {
-        StyleConfiguration{indent: indent, item_separator: item_separator.to_string(), key_separator: key_separator.to_string(), current_indent: String::with_capacity(64), trailing_comma: trailing_comma}
+        FormatConfiguration {indent: indent, item_separator: item_separator.to_string(), key_separator: key_separator.to_string(), current_indent: String::with_capacity(64), trailing_comma: trailing_comma}
     }
 
     pub fn with_indent(indent: usize, trailing_comma: TrailingComma) -> Self {
-        StyleConfiguration{indent: Some(indent), item_separator: ",".to_string(), key_separator: ": ".to_string(), trailing_comma, current_indent: String::with_capacity(64)}
+        FormatConfiguration {indent: Some(indent), item_separator: ",".to_string(), key_separator: ": ".to_string(), trailing_comma, current_indent: String::with_capacity(64)}
     }
 
     pub fn with_separators(item_separator: &str, key_separator: &str, trailing_comma: TrailingComma) -> Self {
-        StyleConfiguration{indent: Some(0), key_separator: key_separator.to_string(), trailing_comma, item_separator: item_separator.to_string(), current_indent: String::with_capacity(64)}
+        FormatConfiguration {indent: Some(0), key_separator: key_separator.to_string(), trailing_comma, item_separator: item_separator.to_string(), current_indent: String::with_capacity(64)}
     }
 
     pub fn default() -> Self {
-        StyleConfiguration{indent: None, item_separator: ", ".to_string(), key_separator: ": ".to_string(), current_indent: String::with_capacity(64), trailing_comma: TrailingComma::NONE}
+        FormatConfiguration {indent: None, item_separator: ", ".to_string(), key_separator: ": ".to_string(), current_indent: String::with_capacity(64), trailing_comma: TrailingComma::NONE}
+    }
 
+    pub fn compact() -> Self {
+        FormatConfiguration {indent: None, item_separator: ",".to_string(), key_separator: ":".to_string(), current_indent: String::with_capacity(64), trailing_comma: TrailingComma::NONE}
     }
 }
 
 impl<'input> JSONKeyValuePair<'input> {
-    fn to_string_styled(&self, style: &mut StyleConfiguration) -> String {
-        format!("{}{}{}", self.key.to_string_styled(style), style.key_separator, self.value)
+    fn to_string_formatted(&self, style: &mut FormatConfiguration) -> String {
+        format!("{}{}{}", self.key.to_string_formatted(style), style.key_separator, self.value)
     }
 }
 
 impl<'input> JSONValue<'input> {
-    fn to_string_styled(&self, style: &mut StyleConfiguration) -> String {
+    fn to_string_formatted(&self, style: &mut FormatConfiguration) -> String {
         match self {
             JSONValue::Identifier(s) | JSONValue::Integer(s) | JSONValue::Float(s) | JSONValue::Exponent(s) | JSONValue::Hexadecimal(s) => {
                 format!("{}", s)
@@ -131,7 +134,7 @@ impl<'input> JSONValue<'input> {
                     }
                 }
                 for (idx, kvp) in key_value_pairs.iter().enumerate() {
-                    ret.push_str(kvp.to_string_styled(style).as_str());
+                    ret.push_str(kvp.to_string_formatted(style).as_str());
                     if idx < key_value_pairs.len() - 1 {
                         match style.indent {
                             None => {
@@ -176,7 +179,7 @@ impl<'input> JSONValue<'input> {
                     }
                 }
                 for (idx, value) in values.iter().enumerate() {
-                    ret.push_str(value.to_string_styled(style).as_str());
+                    ret.push_str(value.to_string_formatted(style).as_str());
                     if idx < values.len() - 1 {
                         match style.indent {
                             None => {
@@ -212,8 +215,8 @@ impl<'input> JSONValue<'input> {
 
 impl<'input> Display for JSONValue<'input> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut style = StyleConfiguration::default();
-        let res = self.to_string_styled(&mut style);
+        let mut style = FormatConfiguration::default();
+        let res = self.to_string_formatted(&mut style);
         write!(f, "{}", res)
     }
 }
@@ -221,7 +224,7 @@ impl<'input> Display for JSONValue<'input> {
 
 impl<'input> Display for JSONText<'input> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.value.to_string_styled(&mut StyleConfiguration::default()))
+        write!(f, "{}", self.value.to_string_formatted(&mut FormatConfiguration::default()))
     }
 }
 

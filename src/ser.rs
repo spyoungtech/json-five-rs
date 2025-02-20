@@ -23,13 +23,13 @@ impl ser::Error for SerdeJSON5Error {
     }
 }
 
-use crate::parser::StyleConfiguration;
+use crate::parser::FormatConfiguration;
 
 /// The JSON5 serializer implementing [ser::Serializer]
 pub struct Serializer {
     // This string starts empty and JSON is appended as values are serialized.
     output: String,
-    style: StyleConfiguration
+    style: FormatConfiguration
 }
 
 type Result<T> = std::result::Result<T, SerdeJSON5Error>;
@@ -60,13 +60,13 @@ where
 {
     let mut serializer = Serializer {
         output: String::new(),
-        style: StyleConfiguration::default()
+        style: FormatConfiguration::default()
     };
     value.serialize(&mut serializer)?;
     Ok(serializer.output)
 }
 
-pub fn to_string_styled<T>(value: &T, style: StyleConfiguration) -> Result<String>
+pub fn to_string_formatted<T>(value: &T, style: FormatConfiguration) -> Result<String>
 where
     T: Serialize
 {
@@ -867,8 +867,8 @@ mod tests {
         "b",
     ],
 }"#;
-        let style = StyleConfiguration::with_indent(4, TrailingComma::ALL);
-        assert_eq!(to_string_styled(&test, style).unwrap(), expected);
+        let style = FormatConfiguration::with_indent(4, TrailingComma::ALL);
+        assert_eq!(to_string_formatted(&test, style).unwrap(), expected);
     }
 
 
