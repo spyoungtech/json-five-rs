@@ -580,11 +580,34 @@ pub fn from_str<'input>(source: &'input str) -> Result<JSONText<'input>, Parsing
     }
 }
 
+/// Like [from_str] but for bytes
+pub fn from_bytes<'input>(source: &'input [u8]) -> Result<JSONText<'input>, ParsingError> {
+    use crate::tokenize::tokenize_bytes;
+    let maybe_toks = tokenize_bytes(source);
+    match maybe_toks {
+        Err(e) => {
+            Err(ParsingError{index: e.index, message: e.message, char_index: e.char_index, lineno: e.lineno, colno: e.colno})
+        }
+        Ok(toks) => {
+            from_tokens(&toks)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::tokenize::Tokenizer;
     use crate::parser::JSONValue::*;
     use super::*;
+
+    #[test]
+    fn test_from_bytes() {
+        let res = from_bytes(b"{}").unwrap();
+        let expected = JSONText{value: JSONValue::JSONObject {key_value_pairs: vec![]}};
+        assert_eq!(res, expected)
+
+    }
+
     #[test]
     fn test_foo() {
         let res = from_str("{}").unwrap();

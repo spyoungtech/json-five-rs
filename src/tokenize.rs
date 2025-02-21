@@ -640,16 +640,18 @@ impl<'input> Iterator for Tokenizer<'input> {
 /// Turn str into [Tokens].
 ///
 /// Usually not used directly.
+/// Token spans will not include whitespace and comment tokens
 pub fn tokenize_str(text: &'_ str) -> Result<Tokens<'_>, TokenizationError> {
     Tokenizer::new(text).tokenize()
 }
 
+/// Like [tokenize_str] but includes whitespace and comment tokens
 pub fn tokenize_rt_str(text: &'_ str) -> Result<Tokens<'_>, TokenizationError> {
     let config = TokenizerConfig{include_comments: true, include_whitespace: true, allow_octal: false};
     Tokenizer::with_configuration(text, config).tokenize()
 }
 
-/// Tokenize bytes to [Tokens]
+/// Like [tokenize_str] but for bytes
 pub fn tokenize_bytes(bytes: &'_ [u8]) -> Result<Tokens<'_>, TokenizationError> {
     let maybe_text = std::str::from_utf8(bytes);
     match maybe_text {
@@ -669,6 +671,7 @@ pub fn tokenize_bytes(bytes: &'_ [u8]) -> Result<Tokens<'_>, TokenizationError> 
     }
 }
 
+/// Like [tokenize_rt_str] but for bytes
 pub fn tokenize_rt_bytes(bytes: &'_ [u8]) -> Result<Tokens<'_>, TokenizationError> {
     let maybe_text = std::str::from_utf8(bytes);
     match maybe_text {
