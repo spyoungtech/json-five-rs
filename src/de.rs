@@ -1,6 +1,6 @@
 use serde::de::{self, DeserializeSeed, Deserialize, Deserializer, MapAccess, SeqAccess, VariantAccess, Visitor};
 use std::fmt;
-use crate::parser::{JSONValue, JSONKeyValuePair, UnaryOperator, from_str as model_from_str};
+use crate::parser::{JSONValue, JSONKeyValuePair, UnaryOperator, from_str as model_from_str, from_bytes as model_from_bytes};
 use crate::utils::unescape;
 #[derive(Debug)]
 pub enum SerdeJSON5Error {
@@ -569,6 +569,22 @@ where
 {
     // 1) Parse the string into your JSONText
     let parsed = model_from_str(s).map_err(|err| SerdeJSON5Error::Custom(err.to_string()))?;
+
+    // 2) Wrap the JSONValue in our deserializer
+    let deserializer = JSONValueDeserializer {
+        input: &parsed.value,
+    };
+
+    // 3) Deserialize into the caller’s type T
+    T::deserialize(deserializer)
+}
+
+pub fn from_bytes<'de, T>(s: &'de [u8]) -> Result<T, SerdeJSON5Error>
+where
+    T: Deserialize<'de>,
+{
+    // 1) Parse the string into your JSONText
+    let parsed = model_from_bytes(s).map_err(|err| SerdeJSON5Error::Custom(err.to_string()))?;
 
     // 2) Wrap the JSONValue in our deserializer
     let deserializer = JSONValueDeserializer {

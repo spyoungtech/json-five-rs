@@ -2,7 +2,7 @@ use json_five::rt::parser::{from_str, ArrayValueContext, JSONValue, KeyValuePair
 
 fn format_value(val: &mut JSONValue) {
     match val {
-        JSONValue::JSONObject { key_value_pairs, context } => {
+        JSONValue::JSONObject { key_value_pairs, .. } => {
             let length = key_value_pairs.len();
             for (idx, kvp) in key_value_pairs.iter_mut().enumerate() {
                 match kvp.value {
