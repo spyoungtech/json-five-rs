@@ -191,7 +191,7 @@ pub fn tokens_to_source(tokens: &Vec<Token>) -> String {
 }
 
 
-
+#[cfg(test)]
 mod tests {
     use super::*;
     #[test]
