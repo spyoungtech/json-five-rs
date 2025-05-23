@@ -538,7 +538,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
             None => {}
             Some(span) => {
                 if span.1 != TokType::EOF {
-                    return Err(self.make_error(format!("Unexpected {:?} token after value", span.1), span.0 - 1))
+                    return Err(self.make_error(format!("Unexpected {:?} token after value", span.1), span.0))
                 }
             }
         }
@@ -599,6 +599,12 @@ mod tests {
     use crate::tokenize::Tokenizer;
     use crate::parser::JSONValue::*;
     use super::*;
+
+        #[test]
+    fn test_fuzz_1() {
+        let res = from_str("0xA18 {9");
+        assert!(res.is_err());
+    }
 
     #[test]
     fn test_from_bytes() {
