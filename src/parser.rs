@@ -251,12 +251,19 @@ struct JSON5Parser<'toks, 'input> {
     source: &'input str,
     source_tokens: Peekable<Iter<'toks, TokenSpan>>,
     lookahead: Option<&'toks TokenSpan>,
+    current_depth: usize,
+    max_depth: usize,
 }
 
 
 impl<'toks, 'input> JSON5Parser<'toks, 'input> {
     fn new(tokens: &'toks Tokens<'input>) -> Self {
-        JSON5Parser { source_tokens: tokens.tok_spans.iter().peekable(), lookahead: None, source: tokens.source }
+        use crate::utils::MAX_DEPTH;
+        JSON5Parser { source_tokens: tokens.tok_spans.iter().peekable(), lookahead: None, source: tokens.source, current_depth: 0, max_depth: MAX_DEPTH }
+    }
+
+    fn with_max_depth(tokens: &'toks Tokens<'input>, max_depth: usize) -> Self {
+        JSON5Parser { source_tokens: tokens.tok_spans.iter().peekable(), lookahead: None, source: tokens.source, current_depth: 0, max_depth: max_depth }
     }
 
     fn advance(&mut self) -> Option<&'toks TokenSpan> {
@@ -529,7 +536,14 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
 
 
     fn parse_value(&mut self) -> Result<JSONValue<'input>, ParsingError> {
-        self.parse_obj_or_array()
+        self.current_depth = self.current_depth + 1;
+        if self.current_depth > self.max_depth {
+            let idx = self.position();
+            return Err(self.make_error(format!("max depth ({}) exceeded in nested arrays/objects. To expand the depth, use the ``with_max_depth`` constructor or enable the `unlimited_depth` feature", self.max_depth), idx))
+        }
+        let res = self.parse_obj_or_array();
+        self.current_depth = self.current_depth - 1;
+        res
     }
 
     fn parse_text(&mut self) -> Result<JSONText<'input>, ParsingError> {
@@ -605,6 +619,23 @@ mod tests {
         let res = from_str("0xA18 {9");
         assert!(res.is_err());
     }
+
+    #[cfg(not(feature = "unlimited_depth"))]
+    #[test]
+    fn test_deeply_nested() {
+        let n = 4000;
+        let mut s = String::with_capacity(n * 2);
+        for _ in 0 .. n {
+            s.push('[')
+        }
+        for _ in 0 .. n {
+            s.push(']')
+        }
+        let res = from_str(s.as_str());
+        assert!(res.is_err());
+        assert!(res.unwrap_err().message.contains("max depth"))
+    }
+
 
     #[test]
     fn test_from_bytes() {

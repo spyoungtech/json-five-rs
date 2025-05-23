@@ -17,6 +17,9 @@ unicode-general-category = { version = "1.0" }
 [features]
 default = ["serde"]
 serde = ["dep:serde"]
+unlimited_depth = []
+
+
 
 [dev-dependencies.serde]
 version = "1.0"
@@ -50,3 +53,4 @@ test = true
 
 [package.metadata.docs.rs]
 all-features = true
+
