@@ -159,3 +159,20 @@ fn char_from_u32(u: u32) -> Result<char, String> {
 fn err<S: Into<String>>(message: S) -> String {
     message.into()
 }
+
+
+#[cfg(all(not(feature = "unlimited_depth"), not(target_os = "windows"), debug_assertions))]
+pub (crate) const MAX_DEPTH: usize = 1000;
+
+#[cfg(all(not(feature = "unlimited_depth"), not(target_os = "windows"), not(debug_assertions)))]
+pub (crate) const MAX_DEPTH: usize = 3000;
+
+
+#[cfg(all(not(feature = "unlimited_depth"), target_os = "windows", debug_assertions))]
+pub (crate) const MAX_DEPTH: usize = 700;
+
+#[cfg(all(not(feature = "unlimited_depth"), target_os = "windows", not(debug_assertions)))]
+pub (crate) const MAX_DEPTH: usize = 2000;
+
+#[cfg(feature = "unlimited_depth")]
+pub (crate) const MAX_DEPTH: usize = usize::MAX;
