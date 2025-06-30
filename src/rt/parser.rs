@@ -613,7 +613,10 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                     TokType::Plus => {
                         let value = self.parse_unary()?;
                         match value {
-                            JSONValue::Float(_) | JSONValue::Integer(_) | JSONValue::Infinity | JSONValue::NaN | JSONValue::Unary { .. } | JSONValue::Hexadecimal(_) | JSONValue::Exponent(_) => {}
+                            JSONValue::Float(_) | JSONValue::Integer(_) | JSONValue::Infinity | JSONValue::NaN | JSONValue::Hexadecimal(_) | JSONValue::Exponent(_) => {}
+                            JSONValue::Unary{ .. } => {
+                                return Err(self.make_error("Only one unary operator is allowed".to_string(), span.2))
+                            }
                             val => {
                                 return Err(self.make_error(format!("Unary operations not allowed for value {:?}", val), span.2))
                             }
@@ -623,7 +626,10 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                     TokType::Minus => {
                         let value = self.parse_unary()?;
                         match value {
-                            JSONValue::Float(_) | JSONValue::Integer(_) | JSONValue::Infinity | JSONValue::NaN | JSONValue::Unary { .. } | JSONValue::Hexadecimal(_) | JSONValue::Exponent(_) => {}
+                            JSONValue::Float(_) | JSONValue::Integer(_) | JSONValue::Infinity | JSONValue::NaN | JSONValue::Hexadecimal(_) | JSONValue::Exponent(_) => {}
+                            JSONValue::Unary{ .. } => {
+                                return Err(self.make_error("Only one unary operator is allowed".to_string(), span.2))
+                            }
                             val => {
                                 return Err(self.make_error(format!("Unary operations not allowed for value {:?}", val), span.2))
                             }

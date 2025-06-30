@@ -494,28 +494,24 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
         match self.check_and_consume(vec![TokType::Plus, TokType::Minus]) {
             None => self.parse_primary(),
             Some(span) => {
+                let value = self.parse_unary()?;
+                match value {
+                    JSONValue::Float(_) | JSONValue::Integer(_) | JSONValue::Infinity | JSONValue::NaN | JSONValue::Hexadecimal(_) | JSONValue::Exponent(_) => {}
+                    JSONValue::Unary{ .. } => {
+                        return Err(self.make_error("Only one unary operator is allowed".to_string(), span.2))
+                    }
+                    val => {
+                        return Err(self.make_error(format!("Unary operations not allowed for value {:?}", val), span.2))
+                    }
+                }
                 match span.1 {
                     TokType::Plus => {
-                        let value = self.parse_unary()?;
-                        match value {
-                            JSONValue::Float(_) | JSONValue::Integer(_) | JSONValue::Infinity | JSONValue::NaN | JSONValue::Unary { .. } | JSONValue::Hexadecimal(_) | JSONValue::Exponent(_) => {}
-                            val => {
-                                return Err(self.make_error(format!("Unary operations not allowed for value {:?}", val), span.2))
-                            }
-                        }
                         Ok(JSONValue::Unary {operator: UnaryOperator::Plus, value: Box::new(value)})
                     }
                     TokType::Minus => {
-                        let value = self.parse_unary()?;
-                        match value {
-                            JSONValue::Float(_) | JSONValue::Integer(_) | JSONValue::Infinity | JSONValue::NaN | JSONValue::Unary { .. } | JSONValue::Hexadecimal(_) | JSONValue::Exponent(_) => {}
-                            val => {
-                                return Err(self.make_error(format!("Unary operations not allowed for value {:?}", val), span.2))
-                            }
-                        }
                         Ok(JSONValue::Unary {operator: UnaryOperator::Minus, value: Box::new(value)})
                     }
-                    _ => unreachable!("no")
+                    _ => unreachable!("unexpected unary token type")
                 }
             }
         }
