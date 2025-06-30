@@ -609,11 +609,6 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
         match self.check_and_consume(vec![TokType::Plus, TokType::Minus]) {
             None => self.parse_primary(),
             Some(span) => {
-                self.current_depth = self.current_depth + 1;
-                if self.current_depth > self.max_depth {
-                    let idx = self.position();
-                    return Err(self.make_error(format!("max depth ({}) exceeded while parsing unary. To expand the depth, use the ``with_max_depth`` constructor or enable the `unlimited_depth` feature", self.max_depth), idx))
-                }
                 match span.1 {
                     TokType::Plus => {
                         let value = self.parse_unary()?;
@@ -623,7 +618,6 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                                 return Err(self.make_error(format!("Unary operations not allowed for value {:?}", val), span.2))
                             }
                         }
-                        self.current_depth = self.current_depth - 1;
                         Ok(JSONValue::Unary {operator: UnaryOperator::Plus, value: Box::new(value)})
                     }
                     TokType::Minus => {
@@ -634,7 +628,6 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                                 return Err(self.make_error(format!("Unary operations not allowed for value {:?}", val), span.2))
                             }
                         }
-                        self.current_depth = self.current_depth - 1;
                         Ok(JSONValue::Unary {operator: UnaryOperator::Minus, value: Box::new(value)})
                     }
                     _ => unreachable!("no")
