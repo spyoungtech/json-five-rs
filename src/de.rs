@@ -70,7 +70,7 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
                         visitor.visit_u64(u)
                     } else {
                         // fallback: treat as a string or produce an error
-                        Err(de::Error::custom(format!("Invalid integer {}", s)))
+                        Err(de::Error::custom(format!("Invalid integer literal: {}", s)))
                     }
                 }
             }
