@@ -1,5 +1,6 @@
 use serde::de::{self, DeserializeSeed, Deserialize, Deserializer, MapAccess, SeqAccess, VariantAccess, Visitor};
 use std::fmt;
+use std::ops::Neg;
 use crate::parser::{JSONValue, JSONKeyValuePair, UnaryOperator, from_str as model_from_str, from_bytes as model_from_bytes};
 use crate::utils::unescape;
 #[derive(Debug)]
@@ -86,7 +87,7 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
             JSONValue::NaN => visitor.visit_f64(f64::NAN),
             JSONValue::Hexadecimal(s) => {
                 // Optionally convert to integer, or treat as string
-                match u64::from_str_radix(s.trim_start_matches("0x"), 16) {
+                match u64::from_str_radix(s.to_lowercase().trim_start_matches("0x"), 16) {
                     Ok(hex) => {
                         visitor.visit_u64(hex)
                     }
@@ -96,13 +97,73 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
                 }
             }
             JSONValue::Unary { operator, value } => {
-                let sign = match operator {
-                    UnaryOperator::Plus => 1.0,
-                    UnaryOperator::Minus => -1.0,
-                };
-                let inner_de = JSONValueDeserializer { input: &**value };
-                let number: f64 = Deserialize::deserialize(inner_de)?;
-                visitor.visit_f64(sign * number)
+                match &**value {
+                    JSONValue::Integer(s) => {
+                        if let Ok(i) = s.parse::<i64>() {
+                            match operator {
+                                UnaryOperator::Plus => {visitor.visit_i64(i)}
+                                UnaryOperator::Minus => {visitor.visit_i64(i.neg())}
+                            }
+                        } else {
+                            match operator {
+                                UnaryOperator::Plus => {
+                                    let x = s.parse::<u64>().map_err(de::Error::custom)?;
+                                    visitor.visit_u64(x)
+                                }
+                                _ => {
+                                    Err(de::Error::custom(format!("Invalid integer literal for unary: {:?}", s)))
+
+                                }
+                            }
+                        }
+                    }
+                    JSONValue::Float(s) | JSONValue::Exponent(s) => {
+                        if let Ok(f) = s.parse::<f64>() {
+                            match operator {
+                                UnaryOperator::Plus => {visitor.visit_f64(f)}
+                                UnaryOperator::Minus => {visitor.visit_f64(f.neg())}
+                            }
+                        } else {
+                            Err(de::Error::custom(format!("Invalid float literal: {:?}", s)))
+                        }
+                    }
+                    JSONValue::Infinity => {
+                        match operator {
+                            UnaryOperator::Plus => {visitor.visit_f64(f64::INFINITY)}
+                            UnaryOperator::Minus => {visitor.visit_f64(f64::NEG_INFINITY)}
+                        }
+                    }
+                    JSONValue::NaN => {
+                        match operator {
+                            UnaryOperator::Plus => {visitor.visit_f64(f64::NAN)}
+                            UnaryOperator::Minus => {visitor.visit_f64(f64::NAN.neg())}
+                        }
+                    }
+                    JSONValue::Hexadecimal(s) => {
+                        match u64::from_str_radix(s.to_lowercase().trim_start_matches("0x"), 16) {
+                            Ok(hex) => {
+                                match operator {
+                                    UnaryOperator::Plus => {
+                                        visitor.visit_u64(hex)
+                                    }
+                                    UnaryOperator::Minus => {
+                                        if hex > i64::MAX as u64 {
+                                            return Err(de::Error::custom(format!("Overflow when converting {} to i64", s)))
+                                        }
+                                        let i = hex as i64;
+                                        visitor.visit_i64(i)
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                Err(de::Error::custom(format!("Invalid hex {}", e)))
+                            }
+                        }
+                    }
+                    invalid_unary_val => {
+                        Err(de::Error::custom(format!("Invalid unary value: {:?}", invalid_unary_val)))
+                    }
+                }
             }
         }
     }
@@ -121,21 +182,21 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
     where
         V: Visitor<'de>
     {
-        self.deserialize_any(visitor)
+        self.deserialize_i64(visitor)
     }
 
     fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>
     {
-        self.deserialize_any(visitor)
+        self.deserialize_i64(visitor)
     }
 
     fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>
     {
-        self.deserialize_any(visitor)
+        self.deserialize_i64(visitor)
     }
 
     fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -148,6 +209,55 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
                 let i = s.parse::<i64>().map_err(de::Error::custom)?;
                 visitor.visit_i64(i)
             }
+            JSONValue::Hexadecimal(s) => {
+                match u64::from_str_radix(s.to_lowercase().trim_start_matches("0x"), 16) {
+                    Ok(hex) => {
+                        if hex > i64::MAX as u64 {
+                            return Err(de::Error::custom(format!("Overflow when converting {} to i64", s)))
+                        }
+                        let i = hex as i64;
+                        visitor.visit_i64(i)
+                    }
+                    Err(e) => {
+                        Err(de::Error::custom(format!("Invalid hex {}", e)))
+                    }
+                }
+            }
+            JSONValue::Unary {operator, value} => {
+                match &**value {
+                    JSONValue::Integer(s) => {
+                        let i = s.parse::<i64>().map_err(de::Error::custom)?;
+                        match operator {
+                            UnaryOperator::Plus => {visitor.visit_i64(i)}
+                            UnaryOperator::Minus => {visitor.visit_i64(-i)}
+                        }
+                    }
+                    JSONValue::Hexadecimal(s) => {
+                        match u64::from_str_radix(s.to_lowercase().trim_start_matches("0x"), 16) {
+                            Ok(hex) => {
+                                if hex > i64::MAX as u64 {
+                                    return Err(de::Error::custom(format!("Overflow when converting {} to i64", s)))
+                                }
+                                let i = hex as i64;
+                                match operator {
+                                    UnaryOperator::Plus => {
+                                        visitor.visit_i64(i)
+                                    }
+                                    UnaryOperator::Minus => {
+                                        visitor.visit_i64(-i)
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                Err(de::Error::custom(format!("Invalid hex {}", e)))
+                            }
+                        }
+                    }
+                    val => {
+                        Err(de::Error::custom(format!("Unsupported value for i64 {:?}", val)))
+                    }
+                }
+            }
             _ => self.deserialize_any(visitor),
         }
     }
@@ -156,35 +266,93 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
     where
         V: Visitor<'de>
     {
-        self.deserialize_any(visitor)
+        self.deserialize_u64(visitor)
     }
 
     fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>
     {
-        self.deserialize_any(visitor)
+        self.deserialize_u64(visitor)
     }
 
     fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>
     {
-        self.deserialize_any(visitor)
+        self.deserialize_u64(visitor)
     }
 
     fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>
     {
-        self.deserialize_any(visitor)
+        match self.input {
+            JSONValue::Integer(s) => {
+                let i = s.parse::<u64>().map_err(de::Error::custom)?;
+                visitor.visit_u64(i)
+            }
+            JSONValue::Hexadecimal(s) => {
+                match u64::from_str_radix(s.to_lowercase().trim_start_matches("0x"), 16) {
+                    Ok(hex) => {
+                        visitor.visit_u64(hex)
+                    }
+                    Err(e) => {
+                        Err(de::Error::custom(format!("Invalid hex {}", e)))
+                    }
+                }
+            }
+            JSONValue::Unary {operator, value} => {
+                match &**value {
+                    JSONValue::Integer(s) => {
+                        let i = s.parse::<u64>().map_err(de::Error::custom)?;
+                        match operator {
+                            UnaryOperator::Plus => {visitor.visit_u64(i)}
+                            UnaryOperator::Minus => {
+                                if i != 0 {
+                                    Err(de::Error::custom(format!("Invalid integer value: {:?}", s)))
+                                } else {
+                                    visitor.visit_u64(0)
+                                }
+                            }
+                        }
+                    }
+                    JSONValue::Hexadecimal(s) => {
+                        match u64::from_str_radix(s.to_lowercase().trim_start_matches("0x"), 16) {
+                            Ok(hex) => {
+                                match operator {
+                                    UnaryOperator::Plus => {
+                                        visitor.visit_u64(hex)
+                                    }
+                                    UnaryOperator::Minus => {
+                                        if hex != 0 {
+                                            Err(de::Error::custom(format!("Invalid integer value: {:?}", s)))
+                                        } else {
+                                            visitor.visit_u64(0)
+                                        }
+
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                Err(de::Error::custom(format!("Invalid hex {}", e)))
+                            }
+                        }
+                    }
+                    val => {
+                        Err(de::Error::custom(format!("Unsupported value for u64 {:?}", val)))
+                    }
+                }
+            }
+            _ => self.deserialize_any(visitor),
+        }
     }
 
     fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>
     {
-        self.deserialize_any(visitor)
+        self.deserialize_f64(visitor)
     }
 
     fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
