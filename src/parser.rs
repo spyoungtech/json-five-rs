@@ -64,7 +64,7 @@ pub struct FormatConfiguration {
 #[allow(dead_code)]
 impl FormatConfiguration {
     pub fn new(indent: Option<usize>, item_separator: &str, key_separator: &str, trailing_comma: TrailingComma) -> Self {
-        FormatConfiguration {indent: indent, item_separator: item_separator.to_string(), key_separator: key_separator.to_string(), current_indent: String::with_capacity(64), trailing_comma: trailing_comma}
+        FormatConfiguration {indent, item_separator: item_separator.to_string(), key_separator: key_separator.to_string(), current_indent: String::with_capacity(64), trailing_comma}
     }
 
     pub fn with_indent(indent: usize, trailing_comma: TrailingComma) -> Self {
@@ -94,16 +94,16 @@ impl<'input> JSONValue<'input> {
     fn to_string_formatted(&self, style: &mut FormatConfiguration) -> String {
         match self {
             JSONValue::Identifier(s) | JSONValue::Integer(s) | JSONValue::Float(s) | JSONValue::Exponent(s) | JSONValue::Hexadecimal(s) => {
-                format!("{}", s)
+                s.to_string()
             }
             JSONValue::Bool(b) => {
-                format!("{}", b)
+                format!("{b}")
             }
             JSONValue::DoubleQuotedString(s) => {
-                format!("\"{}\"", s)
+                format!("\"{s}\"")
             }
             JSONValue::SingleQuotedString(s) => {
-                format!("'{}'", s)
+                format!("'{s}'")
             }
 
             JSONValue::Null => {"null".to_string()}
@@ -116,7 +116,7 @@ impl<'input> JSONValue<'input> {
                     UnaryOperator::Minus => {'-'}
                 };
                 let value_string = value.to_string();
-                format!("{}{}", op_char, value_string)
+                format!("{op_char}{value_string}")
             }
             JSONValue::JSONObject { key_value_pairs} => {
                 let mut ret: String;
@@ -154,7 +154,7 @@ impl<'input> JSONValue<'input> {
                 }
                 match style.indent {
                     None => {
-                        ret.push_str("}");
+                        ret.push('}');
                     }
                     Some(ident) => {
                         style.current_indent.truncate(style.current_indent.len() - ident);
@@ -199,7 +199,7 @@ impl<'input> JSONValue<'input> {
                 }
                 match style.indent {
                     None => {
-                        ret.push_str("]");
+                        ret.push(']');
                     }
                     Some(ident) => {
                         style.current_indent.truncate(style.current_indent.len() - ident);
@@ -217,7 +217,7 @@ impl<'input> Display for JSONValue<'input> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut style = FormatConfiguration::default();
         let res = self.to_string_formatted(&mut style);
-        write!(f, "{}", res)
+        write!(f, "{res}")
     }
 }
 
@@ -263,7 +263,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
     }
 
     fn with_max_depth(tokens: &'toks Tokens<'input>, max_depth: usize) -> Self {
-        JSON5Parser { source_tokens: tokens.tok_spans.iter().peekable(), lookahead: None, source: tokens.source, current_depth: 0, max_depth: max_depth }
+        JSON5Parser { source_tokens: tokens.tok_spans.iter().peekable(), lookahead: None, source: tokens.source, current_depth: 0, max_depth }
     }
 
     fn advance(&mut self) -> Option<&'toks TokenSpan> {
@@ -275,7 +275,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
             Some(span) => {
                 match span.1 {
                     TokType::BlockComment | TokType::LineComment | TokType::Whitespace => {
-                        return self.advance()
+                        self.advance()
                     }
                     _ => {
 
@@ -400,7 +400,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                         }
                         Some(_) => {
                             let val = self.parse_value()?;
-                            let kvp = JSONKeyValuePair{key: key, value: val};
+                            let kvp = JSONKeyValuePair{key, value: val};
                             kvps.push(kvp);
                             match self.check_and_consume(vec![Comma]) {
                                 None => {
@@ -444,7 +444,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                                     return Err(self.make_error("Expecting ']' at end of array".to_string(), idx))
                                 },
                                 Some(_) => {
-                                    break Ok(JSONValue::JSONArray {values: values})
+                                    break Ok(JSONValue::JSONArray {values})
                                 }
                             }
                         }
@@ -454,7 +454,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                     }
                 }
                 Some(_) => {
-                    break Ok(JSONValue::JSONArray {values: values})
+                    break Ok(JSONValue::JSONArray {values})
                 }
             }
         }
@@ -501,7 +501,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                         return Err(self.make_error("Only one unary operator is allowed".to_string(), span.2))
                     }
                     val => {
-                        return Err(self.make_error(format!("Unary operations not allowed for value {:?}", val), span.2))
+                        return Err(self.make_error(format!("Unary operations not allowed for value {val:?}"), span.2))
                     }
                 }
                 match span.1 {
@@ -532,13 +532,13 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
 
 
     fn parse_value(&mut self) -> Result<JSONValue<'input>, ParsingError> {
-        self.current_depth = self.current_depth + 1;
+        self.current_depth += 1;
         if self.current_depth > self.max_depth {
             let idx = self.position();
             return Err(self.make_error(format!("max depth ({}) exceeded in nested arrays/objects. To expand the depth, use the ``with_max_depth`` constructor or enable the `unlimited_depth` feature", self.max_depth), idx))
         }
         let res = self.parse_obj_or_array();
-        self.current_depth = self.current_depth - 1;
+        self.current_depth -= 1;
         res
     }
 
@@ -558,7 +558,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
 
 
 /// Like [from_str] but for [Tokens]
-pub fn from_tokens<'toks, 'input>(tokens: &'toks Tokens<'input>) -> Result<JSONText<'input>, ParsingError> {
+pub fn from_tokens<'input>(tokens: &Tokens<'input>) -> Result<JSONText<'input>, ParsingError> {
     let mut parser = JSON5Parser::new(tokens);
     parser.parse_text()
 }

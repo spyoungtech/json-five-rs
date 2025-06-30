@@ -123,7 +123,7 @@ pub fn unescape(input: &str) -> Result<String, String> {
                 }
                 _ => {
                     // Unknown escape
-                    return Err(format!("Unknown escape character: {}", esc));
+                    return Err(format!("Unknown escape character: {esc}"));
                 }
             }
         }
@@ -140,10 +140,10 @@ pub (crate) fn read_hex_digits<I: Iterator<Item = char>>(
 ) -> Result<u32, String> {
     let mut val = 0u32;
     for _ in 0..count {
-        let c = chars.next().ok_or_else(|| err(format!("Incomplete {} escape", context)))?;
+        let c = chars.next().ok_or_else(|| err(format!("Incomplete {context} escape")))?;
         let digit = c
             .to_digit(16)
-            .ok_or_else(|| err(format!("Invalid hex digit '{}' in {} escape", c, context)))?;
+            .ok_or_else(|| err(format!("Invalid hex digit '{c}' in {context} escape")))?;
         val = (val << 4) | digit;
     }
     Ok(val)
@@ -153,7 +153,7 @@ pub (crate) fn read_hex_digits<I: Iterator<Item = char>>(
 fn char_from_u32(u: u32) -> Result<char, String> {
     // In ES5.1, `\uXXXX` covers 0..=0xFFFF. If you need to disallow >0xFFFF, insert a check:
     // if u > 0xFFFF { return Err(err(format!("Code point out of range: U+{:X}", u))); }
-    std::char::from_u32(u).ok_or_else(|| err(format!("Invalid Unicode code point U+{:X}", u)))
+    std::char::from_u32(u).ok_or_else(|| err(format!("Invalid Unicode code point U+{u:X}")))
 }
 
 fn err<S: Into<String>>(message: S) -> String {

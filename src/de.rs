@@ -11,7 +11,7 @@ pub enum SerdeJSON5Error {
 impl fmt::Display for SerdeJSON5Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SerdeJSON5Error::Custom(msg) => write!(f, "{}", msg),
+            SerdeJSON5Error::Custom(msg) => write!(f, "{msg}"),
         }
     }
 }
@@ -71,7 +71,7 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
                         visitor.visit_u64(u)
                     } else {
                         // fallback: treat as a string or produce an error
-                        Err(de::Error::custom(format!("Invalid integer literal: {}", s)))
+                        Err(de::Error::custom(format!("Invalid integer literal: {s}")))
                     }
                 }
             }
@@ -80,7 +80,7 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
                 if let Ok(f) = s.parse::<f64>() {
                     visitor.visit_f64(f)
                 } else {
-                    Err(de::Error::custom(format!("Invalid float {}", s)))
+                    Err(de::Error::custom(format!("Invalid float {s}")))
                 }
             }
             JSONValue::Infinity => visitor.visit_f64(f64::INFINITY),
@@ -92,7 +92,7 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
                         visitor.visit_u64(hex)
                     }
                     Err(e) => {
-                        Err(de::Error::custom(format!("Invalid hex {}", e)))
+                        Err(de::Error::custom(format!("Invalid hex {e}")))
                     }
                 }
             }
@@ -111,7 +111,7 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
                                     visitor.visit_u64(x)
                                 }
                                 _ => {
-                                    Err(de::Error::custom(format!("Invalid integer literal for unary: {:?}", s)))
+                                    Err(de::Error::custom(format!("Invalid integer literal for unary: {s:?}")))
 
                                 }
                             }
@@ -124,7 +124,7 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
                                 UnaryOperator::Minus => {visitor.visit_f64(f.neg())}
                             }
                         } else {
-                            Err(de::Error::custom(format!("Invalid float literal: {:?}", s)))
+                            Err(de::Error::custom(format!("Invalid float literal: {s:?}")))
                         }
                     }
                     JSONValue::Infinity => {
@@ -148,7 +148,7 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
                                     }
                                     UnaryOperator::Minus => {
                                         if hex > i64::MAX as u64 {
-                                            return Err(de::Error::custom(format!("Overflow when converting {} to i64", s)))
+                                            return Err(de::Error::custom(format!("Overflow when converting {s} to i64")))
                                         }
                                         let i = hex as i64;
                                         visitor.visit_i64(i)
@@ -156,12 +156,12 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
                                 }
                             }
                             Err(e) => {
-                                Err(de::Error::custom(format!("Invalid hex {}", e)))
+                                Err(de::Error::custom(format!("Invalid hex {e}")))
                             }
                         }
                     }
                     invalid_unary_val => {
-                        Err(de::Error::custom(format!("Invalid unary value: {:?}", invalid_unary_val)))
+                        Err(de::Error::custom(format!("Invalid unary value: {invalid_unary_val:?}")))
                     }
                 }
             }
@@ -213,13 +213,13 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
                 match u64::from_str_radix(s.to_lowercase().trim_start_matches("0x"), 16) {
                     Ok(hex) => {
                         if hex > i64::MAX as u64 {
-                            return Err(de::Error::custom(format!("Overflow when converting {} to i64", s)))
+                            return Err(de::Error::custom(format!("Overflow when converting {s} to i64")))
                         }
                         let i = hex as i64;
                         visitor.visit_i64(i)
                     }
                     Err(e) => {
-                        Err(de::Error::custom(format!("Invalid hex {}", e)))
+                        Err(de::Error::custom(format!("Invalid hex {e}")))
                     }
                 }
             }
@@ -236,7 +236,7 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
                         match u64::from_str_radix(s.to_lowercase().trim_start_matches("0x"), 16) {
                             Ok(hex) => {
                                 if hex > i64::MAX as u64 {
-                                    return Err(de::Error::custom(format!("Overflow when converting {} to i64", s)))
+                                    return Err(de::Error::custom(format!("Overflow when converting {s} to i64")))
                                 }
                                 let i = hex as i64;
                                 match operator {
@@ -249,12 +249,12 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
                                 }
                             }
                             Err(e) => {
-                                Err(de::Error::custom(format!("Invalid hex {}", e)))
+                                Err(de::Error::custom(format!("Invalid hex {e}")))
                             }
                         }
                     }
                     val => {
-                        Err(de::Error::custom(format!("Unsupported value for i64 {:?}", val)))
+                        Err(de::Error::custom(format!("Unsupported value for i64 {val:?}")))
                     }
                 }
             }
@@ -298,7 +298,7 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
                         visitor.visit_u64(hex)
                     }
                     Err(e) => {
-                        Err(de::Error::custom(format!("Invalid hex {}", e)))
+                        Err(de::Error::custom(format!("Invalid hex {e}")))
                     }
                 }
             }
@@ -310,7 +310,7 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
                             UnaryOperator::Plus => {visitor.visit_u64(i)}
                             UnaryOperator::Minus => {
                                 if i != 0 {
-                                    Err(de::Error::custom(format!("Invalid integer value: {:?}", s)))
+                                    Err(de::Error::custom(format!("Invalid integer value: {s:?}")))
                                 } else {
                                     visitor.visit_u64(0)
                                 }
@@ -326,7 +326,7 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
                                     }
                                     UnaryOperator::Minus => {
                                         if hex != 0 {
-                                            Err(de::Error::custom(format!("Invalid integer value: {:?}", s)))
+                                            Err(de::Error::custom(format!("Invalid integer value: {s:?}")))
                                         } else {
                                             visitor.visit_u64(0)
                                         }
@@ -335,12 +335,12 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
                                 }
                             }
                             Err(e) => {
-                                Err(de::Error::custom(format!("Invalid hex {}", e)))
+                                Err(de::Error::custom(format!("Invalid hex {e}")))
                             }
                         }
                     }
                     val => {
-                        Err(de::Error::custom(format!("Unsupported value for u64 {:?}", val)))
+                        Err(de::Error::custom(format!("Unsupported value for u64 {val:?}")))
                     }
                 }
             }

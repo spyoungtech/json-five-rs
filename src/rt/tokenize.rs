@@ -98,7 +98,7 @@ pub fn source_to_tokens(text: &str) -> Result<Vec<Token>, TokenizationError> {
                 source_tokens.push(token);
                 match spans.next() {
                     None => {
-                        assert_eq!(next_span.1, TokType::EOF, "Unexpected end of document while token remaining {:?}", next_span);
+                        assert_eq!(next_span.1, TokType::EOF, "Unexpected end of document while token remaining {next_span:?}");
                         let context = TokenContext{start_lineno:lineno, start_colno: colno, start_byte_offset: next_span.0, start_char_index: codepoint_off, end_byte_offset: next_span.0};
                         let token = Token{lexeme: String::with_capacity(0), context: Some(context), tok_type: TokType::EOF};
                         source_tokens.push(token);
@@ -131,7 +131,7 @@ pub fn source_to_tokens(text: &str) -> Result<Vec<Token>, TokenizationError> {
             source_tokens.push(token);
             match spans.next() {
                 None => {
-                    assert_eq!(next_span.1, TokType::EOF, "Unexpected end of document while token remaining {:?}", next_span);
+                    assert_eq!(next_span.1, TokType::EOF, "Unexpected end of document while token remaining {next_span:?}");
                     let context = TokenContext{start_lineno:lineno, start_colno: colno, start_byte_offset: next_span.0, start_char_index: codepoint_off, end_byte_offset: next_span.0};
                     let token = Token{lexeme: String::with_capacity(0), context: Some(context), tok_type: TokType::EOF};
                     source_tokens.push(token);

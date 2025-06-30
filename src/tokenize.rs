@@ -80,6 +80,12 @@ pub struct TokenizerConfig {
     pub allow_octal: bool,
 }
 
+impl Default for TokenizerConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TokenizerConfig {
     pub fn new() -> Self {
         TokenizerConfig {include_whitespace: false, include_comments: false, allow_octal: false}
@@ -88,11 +94,11 @@ impl TokenizerConfig {
 
 impl <'input> Tokenizer<'input> {
     pub fn new(text: &'input str) -> Self {
-        Tokenizer {configuration: TokenizerConfig::new(), text: text, chars: text.char_indices().peekable(), lookahead: None}
+        Tokenizer {configuration: TokenizerConfig::new(), text, chars: text.char_indices().peekable(), lookahead: None}
     }
 
     pub fn with_configuration(text: &'input str, configuration: TokenizerConfig) -> Self {
-        Tokenizer {configuration: configuration, text: text, chars: text.char_indices().peekable(), lookahead: None}
+        Tokenizer {configuration, text, chars: text.char_indices().peekable(), lookahead: None}
     }
 
     fn advance(&mut self) -> Option<(usize, char)> {
@@ -102,7 +108,7 @@ impl <'input> Tokenizer<'input> {
 
     fn make_error(&self, message: String, start_index: usize) -> TokenizationError {
         let (lineno, colno, char_index) = get_line_col_char(self.text, start_index);
-        TokenizationError{message: message, index: start_index, lineno: lineno, colno: colno, char_index: char_index}
+        TokenizationError{message, index: start_index, lineno, colno, char_index}
     }
 
     fn process_string(&mut self) -> Result<TokenSpan, TokenizationError> {
@@ -199,11 +205,11 @@ impl <'input> Tokenizer<'input> {
 
         match self.advance() {
             None => {
-                return Err(self.make_error("Expected at least one digit in hexadecimal literal".to_string(), start_idx))
+                Err(self.make_error("Expected at least one digit in hexadecimal literal".to_string(), start_idx))
             }
             Some((mut last_idx, first_digit)) => {
                 if !HEX_CHARS.contains(first_digit) {
-                    return Err(self.make_error(format!("Invalid hexadecimal character {:?} in literal starting at", first_digit), start_idx))
+                    return Err(self.make_error(format!("Invalid hexadecimal character {first_digit:?} in literal starting at"), start_idx))
                 }
                 loop {
                     match self.chars.peek() {
@@ -258,7 +264,7 @@ impl <'input> Tokenizer<'input> {
                     if unary_seen || exponent_seen {
                         let (_, last_char) = self.lookahead.unwrap();
                         if "+-eE".contains(last_char) {
-                            return Err(self.make_error(format!("Invalid number literal (missing digit after {:?})", last_char), start_idx))
+                            return Err(self.make_error(format!("Invalid number literal (missing digit after {last_char:?})"), start_idx))
                         }
                     }
                     if exponent_seen {
@@ -318,7 +324,7 @@ impl <'input> Tokenizer<'input> {
                             if unary_seen || exponent_seen {
                                 let (_, last_char) = self.lookahead.unwrap();
                                 if "+-eE".contains(last_char) {
-                                    return Err(self.make_error(format!("Invalid number literal (missing digit after {:?})", last_char), start_idx))
+                                    return Err(self.make_error(format!("Invalid number literal (missing digit after {last_char:?})"), start_idx))
                                 }
                             }
                             if exponent_seen {
@@ -386,17 +392,17 @@ impl <'input> Tokenizer<'input> {
                                 let maybe_hex_val = read_hex_digits(&mut ubuffer.chars().peekable(), 4, ubuffer.as_str());
                                 match maybe_hex_val {
                                     Err(_) => {
-                                        return Err(self.make_error(format!("invalid unicode escape: \\u{}", ubuffer), start_idx))
+                                        return Err(self.make_error(format!("invalid unicode escape: \\u{ubuffer}"), start_idx))
                                     }
                                     Ok(hex_val) => {
                                         let maybe_c = char::from_u32(hex_val);
                                         match maybe_c {
                                             None => {
-                                                return Err(self.make_error(format!("invalid unicode escape value: \\u{}", ubuffer), start_idx))
+                                                return Err(self.make_error(format!("invalid unicode escape value: \\u{ubuffer}"), start_idx))
                                             }
                                             Some(c) => {
                                                 if !c.is_alphabetic() && !IDENTIFIER_START_SYMBOLS.contains(c) {
-                                                    return Err(self.make_error(format!("Illegal identifier start from unicode escape sequence: \\u{}", ubuffer), start_idx))
+                                                    return Err(self.make_error(format!("Illegal identifier start from unicode escape sequence: \\u{ubuffer}"), start_idx))
                                                 }
                                             }
                                         }
@@ -411,7 +417,7 @@ impl <'input> Tokenizer<'input> {
                 }
             }
             _ => {
-                return Err(self.make_error(format!("Invalid character {}", start_char), start_idx))
+                return Err(self.make_error(format!("Invalid character {start_char}"), start_idx))
             }
         }
         let mut last_char = start_char;
@@ -595,7 +601,7 @@ impl <'input> Tokenizer<'input> {
                                 }
                             },
                             _ => {
-                                return Err(self.make_error("unexpected token '/'".to_string(), next_idx))
+                                Err(self.make_error("unexpected token '/'".to_string(), next_idx))
                             }
                         }
                     }

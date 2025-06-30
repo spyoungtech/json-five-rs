@@ -289,7 +289,7 @@ impl JSONValue {
             JSONValue::DoubleQuotedString(s) => {s.clone()}
             JSONValue::SingleQuotedString(s) => {s.clone()}
             JSONValue::Unary { operator, value} => {
-                format!("{}{}", operator, value)
+                format!("{operator}{value}")
             }
             JSONValue::Identifier(s) => {s.clone()}
         }
@@ -300,7 +300,7 @@ impl JSONValue {
 impl Display for JSONValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let res = self.to_string();
-        write!(f, "{}", res)
+        write!(f, "{res}")
     }
 }
 
@@ -346,7 +346,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
     }
 
     fn with_max_depth(&mut self, tokens: &'toks Tokens<'input>, max_depth: usize) -> Self {
-        JSON5Parser { source_tokens: tokens.tok_spans.iter().peekable(), lookahead: None, source: tokens.source, current_depth: 0, max_depth: max_depth }
+        JSON5Parser { source_tokens: tokens.tok_spans.iter().peekable(), lookahead: None, source: tokens.source, current_depth: 0, max_depth }
     }
 
     fn advance(&mut self) -> Option<&'toks TokenSpan> {
@@ -480,7 +480,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                                         self.collect_wsc_vec_to_string(&wsc_2),
                                         None
                                         )};
-                                    let kvp = JSONKeyValuePair{key: key, value: val, context: Some(context)};
+                                    let kvp = JSONKeyValuePair{key, value: val, context: Some(context)};
                                     kvps.push(kvp);
                                     match self.check_and_consume(vec![RightBrace]) {
                                         None => {
@@ -488,7 +488,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                                             return Err(self.make_error("Expecting '}' at end of object".to_string(), idx))
                                         },
                                         Some(_) => {
-                                            break Ok(JSONValue::JSONObject {key_value_pairs: kvps, context: Some(JSONObjectContext{wsc: (self.collect_wsc_vec_to_string(&leading_wsc), )})})
+                                            break Ok(JSONValue::JSONObject {key_value_pairs: kvps, context: Some(JSONObjectContext{wsc: (self.collect_wsc_vec_to_string(leading_wsc), )})})
                                         }
                                     }
                                 }
@@ -500,7 +500,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                                         self.collect_wsc_vec_to_string(&wsc_2),
                                         Some(self.collect_wsc_vec_to_string(&wsc_3)),
                                     )};
-                                    let kvp = JSONKeyValuePair{key: key, value: val, context: Some(context)};
+                                    let kvp = JSONKeyValuePair{key, value: val, context: Some(context)};
                                     kvps.push(kvp);
                                     continue
                                 }
@@ -509,7 +509,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                     }
                 }
                 Some(_) => {
-                    break Ok(JSONValue::JSONObject {key_value_pairs: kvps, context: Some(JSONObjectContext{wsc: (self.collect_wsc_vec_to_string(&leading_wsc), )})})
+                    break Ok(JSONValue::JSONObject {key_value_pairs: kvps, context: Some(JSONObjectContext{wsc: (self.collect_wsc_vec_to_string(leading_wsc), )})})
                 }
             }
         }
@@ -517,7 +517,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
 
 
     fn collect_wsc_vec_to_string(&self, wsc: &Vec<&'toks TokenSpan>) -> String {
-        if wsc.len() == 0 {
+        if wsc.is_empty() {
             return String::with_capacity(0);
         }
 
@@ -555,7 +555,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                                     return Err(self.make_error("Expecting ']' at end of array".to_string(), idx))
                                 },
                                 Some(_) => {
-                                    break Ok(JSONValue::JSONArray {values: values, context: Some(JSONArrayContext{wsc: (self.collect_wsc_vec_to_string(&leading_wsc), )})})
+                                    break Ok(JSONValue::JSONArray {values, context: Some(JSONArrayContext{wsc: (self.collect_wsc_vec_to_string(&leading_wsc), )})})
                                 }
                             }
                         }
@@ -569,7 +569,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                     }
                 }
                 Some(_) => {
-                    break Ok(JSONValue::JSONArray {values: values, context: Some(JSONArrayContext{wsc: (self.collect_wsc_vec_to_string(&leading_wsc), )})})
+                    break Ok(JSONValue::JSONArray {values, context: Some(JSONArrayContext{wsc: (self.collect_wsc_vec_to_string(&leading_wsc), )})})
                 }
             }
         }
@@ -618,7 +618,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                                 return Err(self.make_error("Only one unary operator is allowed".to_string(), span.2))
                             }
                             val => {
-                                return Err(self.make_error(format!("Unary operations not allowed for value {:?}", val), span.2))
+                                return Err(self.make_error(format!("Unary operations not allowed for value {val:?}"), span.2))
                             }
                         }
                         Ok(JSONValue::Unary {operator: UnaryOperator::Plus, value: Box::new(value)})
@@ -631,7 +631,7 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
                                 return Err(self.make_error("Only one unary operator is allowed".to_string(), span.2))
                             }
                             val => {
-                                return Err(self.make_error(format!("Unary operations not allowed for value {:?}", val), span.2))
+                                return Err(self.make_error(format!("Unary operations not allowed for value {val:?}"), span.2))
                             }
                         }
                         Ok(JSONValue::Unary {operator: UnaryOperator::Minus, value: Box::new(value)})
@@ -657,13 +657,13 @@ impl<'toks, 'input> JSON5Parser<'toks, 'input> {
 
 
     fn parse_value(&mut self) -> Result<JSONValue, ParsingError> {
-        self.current_depth = self.current_depth + 1;
+        self.current_depth += 1;
         if self.current_depth > self.max_depth {
             let idx = self.position();
             return Err(self.make_error(format!("max depth ({}) exceeded in nested arrays/objects. To expand the depth, use the ``with_max_depth`` constructor or enable the `unlimited_depth` feature", self.max_depth), idx))
         }
         let res = self.parse_obj_or_array();
-        self.current_depth = self.current_depth - 1;
+        self.current_depth -= 1;
         res
     }
 
