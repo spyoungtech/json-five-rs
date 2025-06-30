@@ -224,10 +224,22 @@ impl <'input> Tokenizer<'input> {
 
     fn process_number(&mut self) -> Result<TokenSpan, TokenizationError>{
         let (start_idx, start_char) = self.lookahead.expect("Unexpected end of input, was expecting numeric char");
+        let mut last_index = start_idx;
+        let mut decimal_seen: bool = false;
+        let mut exponent_seen: bool = false;
+        let mut unary_seen: bool = false;
+        if start_char == '.' {
+            decimal_seen = true
+        }
 
         let maybe_second_char = self.chars.peek();
         match maybe_second_char {
-            None => return Ok((start_idx, TokType::Integer, start_idx + 1)),
+            None => {
+                if decimal_seen {
+                    return Err(self.make_error("Lone decimal is an invalid literal".to_string(), start_idx))
+                }
+                return Ok((start_idx, TokType::Integer, start_idx + 1))
+            },
             Some((_second_idx, second_char)) if start_char == '0' => {
                 match second_char {
                     'x' | 'X' => {return self.process_hexadecimal()}
@@ -240,15 +252,6 @@ impl <'input> Tokenizer<'input> {
             _ => {}
         }
 
-        let mut last_index = start_idx;
-        let mut decimal_seen: bool = false;
-        let mut exponent_seen: bool = false;
-        let mut unary_seen: bool = false;
-        match start_char {
-            '.' => {decimal_seen = true}
-            '+' | '-' => {unary_seen = true}
-            _ => {}
-        }
         loop {
             match self.chars.peek() {
                 None => {
