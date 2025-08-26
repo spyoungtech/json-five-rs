@@ -53,6 +53,8 @@ pub (crate) fn escape_double_quoted(input: &str) -> String {
             '/'  => { escaped.push('\\'); escaped.push('/');  }
             '\u{0008}' => { escaped.push('\\'); escaped.push('b'); }
             '\u{000c}' => { escaped.push('\\'); escaped.push('f'); }
+            '\u{2028}' => { escaped.push_str("\\u2028"); }
+            '\u{2029}' => { escaped.push_str("\\u2029"); }
             _ => escaped.push(c),
         }
     }
@@ -65,7 +67,7 @@ pub (crate) fn escape_single_quoted(input: &str) -> String {
     let mut escaped = String::with_capacity(input.len() * 2);
     for c in input.chars() {
         match c {
-            '\''  => { escaped.push('\\'); escaped.push('"');  }
+            '\''  => { escaped.push('\\'); escaped.push('\'');  }
             '\\' => { escaped.push('\\'); escaped.push('\\'); }
             '\n' => { escaped.push('\\'); escaped.push('n');  }
             '\r' => { escaped.push('\\'); escaped.push('r');  }
@@ -73,6 +75,8 @@ pub (crate) fn escape_single_quoted(input: &str) -> String {
             '/'  => { escaped.push('\\'); escaped.push('/');  }
             '\u{0008}' => { escaped.push('\\'); escaped.push('b'); }
             '\u{000c}' => { escaped.push('\\'); escaped.push('f'); }
+            '\u{2028}' => { escaped.push_str("\\u2028"); }
+            '\u{2029}' => { escaped.push_str("\\u2029"); }
             _ => escaped.push(c),
         }
     }
@@ -176,3 +180,151 @@ pub (crate) const MAX_DEPTH: usize = 2000;
 
 #[cfg(feature = "unlimited_depth")]
 pub (crate) const MAX_DEPTH: usize = usize::MAX;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_escape_single_quote_bug() {
+        let input = "Hello'World";
+        let result = escape_single_quoted(input);
+        let expected = "Hello\\'World";
+        assert_eq!(result, expected, "Single quote should be escaped as \\' not \\\"");
+    }
+
+    #[test]
+    fn test_escape_double_quoted_comprehensive() {
+        let input = "Hello\"World\n\t\r\\";
+        let result = escape_double_quoted(input);
+        let expected = "Hello\\\"World\\n\\t\\r\\\\";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_escape_single_quoted_comprehensive() {
+        let input = "Hello'World\n\t\r\\";
+        let result = escape_single_quoted(input);
+        let expected = "Hello\\'World\\n\\t\\r\\\\";
+        assert_eq!(result, expected);
+    }
+
+    #[test] 
+    fn test_unescape_basic_escapes() {
+        let input = "Hello\\nWorld\\t\\r\\\\";
+        let result = unescape(input).unwrap();
+        let expected = "Hello\nWorld\t\r\\";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_unescape_quotes() {
+        let input = "He said \\\"Hello\\\" and she said \\'Hi\\'";
+        let result = unescape(input).unwrap();
+        let expected = "He said \"Hello\" and she said 'Hi'";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_unescape_unicode_valid() {
+        let input = "Unicode: \\u0041\\u0042\\u2764";
+        let result = unescape(input).unwrap();
+        let expected = "Unicode: AB❤";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_unescape_hex_valid() {
+        let input = "Hex: \\x41\\x42\\x21";
+        let result = unescape(input).unwrap();
+        let expected = "Hex: AB!";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_unescape_invalid_unicode_short() {
+        let input = "Invalid: \\u12G";  // Invalid hex digit
+        let result = unescape(input);
+        assert!(result.is_err(), "Should fail on invalid unicode escape");
+    }
+
+    #[test]
+    fn test_unescape_invalid_unicode_incomplete() {
+        let input = "Incomplete: \\u123";  // Too few digits
+        let result = unescape(input);
+        assert!(result.is_err(), "Should fail on incomplete unicode escape");
+    }
+
+    #[test]
+    fn test_unescape_invalid_hex_char() {
+        let input = "Invalid hex: \\xZZ";
+        let result = unescape(input);
+        assert!(result.is_err(), "Should fail on invalid hex escape");
+    }
+
+    #[test]
+    fn test_unescape_invalid_hex_incomplete() {
+        let input = "Incomplete hex: \\x1";
+        let result = unescape(input);
+        assert!(result.is_err(), "Should fail on incomplete hex escape");
+    }
+
+    #[test]
+    fn test_unescape_unknown_escape() {
+        let input = "Unknown: \\z";
+        let result = unescape(input);
+        assert!(result.is_err(), "Should fail on unknown escape sequence");
+    }
+
+    #[test]
+    fn test_unescape_incomplete_escape_at_end() {
+        let input = "Incomplete: \\";
+        let result = unescape(input);
+        assert!(result.is_err(), "Should fail on incomplete escape at end");
+    }
+
+    #[test]
+    fn test_unescape_line_continuation() {
+        let input = "Line\\ncontinuation";
+        let result = unescape(input).unwrap();
+        let expected = "Line\ncontinuation";
+        assert_eq!(result, expected);
+    }
+
+    #[test] 
+    fn test_unescape_all_special_chars() {
+        let input = "\\a\\b\\f\\n\\r\\t\\v\\0\\\\\\'\\\"";
+        let result = unescape(input).unwrap();
+        let expected = "\x07\x08\x0C\n\r\t\x0B\0\\'\"";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_unescape_unicode_line_separators() {
+        let input = "\\u2028\\u2029";  // Line separator, Paragraph separator
+        let result = unescape(input).unwrap();
+        let expected = "\u{2028}\u{2029}";
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_read_hex_digits_valid() {
+        let mut chars = "ABCD".chars().peekable();
+        let result = read_hex_digits(&mut chars, 4, "\\u").unwrap();
+        assert_eq!(result, 0xABCD);
+    }
+
+    #[test]
+    fn test_read_hex_digits_invalid_char() {
+        let mut chars = "12G4".chars().peekable();
+        let result = read_hex_digits(&mut chars, 4, "\\u");
+        assert!(result.is_err(), "Should fail on invalid hex character");
+    }
+
+    #[test]
+    fn test_read_hex_digits_incomplete() {
+        let mut chars = "12".chars().peekable();
+        let result = read_hex_digits(&mut chars, 4, "\\u");
+        assert!(result.is_err(), "Should fail on incomplete hex sequence");
+    }
+}
