@@ -43,9 +43,27 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
             JSONValue::Null => visitor.visit_unit(),
             JSONValue::Bool(b) => visitor.visit_bool(*b),
             JSONValue::DoubleQuotedString(s) | JSONValue::SingleQuotedString(s) => {
-                visitor.visit_str(unescape(s).unwrap().as_str())
+                match unescape(s) {
+                    Ok(unescaped) => {
+                        visitor.visit_str(unescaped.as_str())
+                    }
+                    Err(e) => {
+                        Err(de::Error::custom(e.to_string()))
+                    }
+                }
+
             }
-            JSONValue::Identifier(s) => visitor.visit_str(unescape(s).unwrap().as_str()),
+            JSONValue::Identifier(s) => {
+                match unescape(s) {
+                    Ok(unescaped) => {
+                        visitor.visit_str(unescaped.as_str())
+                    }
+                    Err(e) => {
+                        Err(de::Error::custom(e.to_string()))
+                    }
+                }
+
+            },
             JSONValue::JSONObject { key_value_pairs } => {
                 // Treat as a map
                 let mut map_deserializer = JSONMapAccess {
@@ -556,7 +574,17 @@ impl<'de, 'a> Deserializer<'de> for JSONValueDeserializer<'a> {
         match self.input {
             JSONValue::Identifier(s)
             | JSONValue::DoubleQuotedString(s)
-            | JSONValue::SingleQuotedString(s) => visitor.visit_str(unescape(s).unwrap().as_str()),
+            | JSONValue::SingleQuotedString(s) => {
+                match unescape(s) {
+                    Ok(unescaped) => {
+                        visitor.visit_str(unescaped.as_str())
+                    }
+                    Err(e) => {
+                        Err(de::Error::custom(e.to_string()))
+                    }
+                }
+
+            },
             _ => self.deserialize_any(visitor),
         }
     }
