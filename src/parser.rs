@@ -175,7 +175,7 @@ impl<'input> JSONValue<'input> {
                         for _ in 0 .. ident {
                             style.current_indent.push(' ');
                         }
-                        ret = format!("{{\n{}", style.current_indent);
+                        ret = format!("[\n{}", style.current_indent);
                     }
                 }
                 for (idx, value) in values.iter().enumerate() {
@@ -203,7 +203,7 @@ impl<'input> JSONValue<'input> {
                     }
                     Some(ident) => {
                         style.current_indent.truncate(style.current_indent.len() - ident);
-                        ret.push_str(format!("\n{}}}", style.current_indent).as_str());
+                        ret.push_str(format!("\n{}]", style.current_indent).as_str());
                     }
                 }
                 ret
