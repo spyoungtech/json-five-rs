@@ -29,12 +29,12 @@ output
 // My Document
 {
     breakfast: [
-        bacon,
-        eggs,
-        spam,  // <-- a trailing comma will be added here
+        'bacon',
+        'eggs',
+        'spam',  // <-- a trailing comma will be added here
     ],
     objekt: {
-        nested: value, // <-- and here
+        nested: "value", // <-- and here
     }, // <--- and here
 }
 
