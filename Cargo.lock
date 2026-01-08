@@ -274,7 +274,7 @@ dependencies = [
 
 [[package]]
 name = "json-five"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "criterion",
  "json5",

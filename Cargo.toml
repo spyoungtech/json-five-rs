@@ -1,6 +1,6 @@
 [package]
 name = "json-five"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 license = "MIT"
 description = "JSON5 parser with round-trip capabilities and compatible with the serde data model"
