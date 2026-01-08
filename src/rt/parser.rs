@@ -286,8 +286,12 @@ impl JSONValue {
             JSONValue::NaN => {String::from("Nan")}
             JSONValue::Hexadecimal(s) => {s.clone()}
             JSONValue::Bool(b) => b.to_string(),
-            JSONValue::DoubleQuotedString(s) => {s.clone()}
-            JSONValue::SingleQuotedString(s) => {s.clone()}
+            JSONValue::DoubleQuotedString(s) => {
+                format!("\"{s}\"")
+            }
+            JSONValue::SingleQuotedString(s) => {
+                format!("'{s}'")
+            }
             JSONValue::Unary { operator, value} => {
                 format!("{operator}{value}")
             }
