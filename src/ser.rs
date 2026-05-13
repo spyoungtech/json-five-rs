@@ -391,17 +391,19 @@ impl ser::SerializeSeq for &mut Serializer {
 
     // Close the sequence.
     fn end(self) -> Result<()> {
-        match self.style.trailing_comma {
+        if !self.output.ends_with('[') {
+            match self.style.trailing_comma {
             TrailingComma::ALL | TrailingComma::OBJECTS => {
                 self.output.push(',')
+                }
+                _ => {}
             }
-            _ => {}
-        }
-        if let Some(ident) = self.style.indent {
+            if let Some(ident) = self.style.indent {
             self.style.current_indent.truncate(self.style.current_indent.len() - ident);
-            self.output.reserve(self.style.current_indent.len() + 1);
-            self.output.push('\n');
-            self.output.push_str(self.style.current_indent.as_str());
+                self.output.reserve(self.style.current_indent.len() + 1);
+                self.output.push('\n');
+                self.output.push_str(self.style.current_indent.as_str());
+            }
         }
         self.output.push(']');
         Ok(())
@@ -440,17 +442,19 @@ impl ser::SerializeTuple for &mut Serializer {
     }
 
     fn end(self) -> Result<()> {
-        match self.style.trailing_comma {
+        if !self.output.ends_with('[') {
+            match self.style.trailing_comma {
             TrailingComma::ALL | TrailingComma::OBJECTS => {
                 self.output.push(',')
             }
-            _ => {}
-        }
-        if let Some(ident) = self.style.indent {
+                _ => {}
+            }
+            if let Some(ident) = self.style.indent {
             self.style.current_indent.truncate(self.style.current_indent.len() - ident);
-            self.output.reserve(self.style.current_indent.len() + 1);
-            self.output.push('\n');
-            self.output.push_str(self.style.current_indent.as_str());
+                self.output.reserve(self.style.current_indent.len() + 1);
+                self.output.push('\n');
+                self.output.push_str(self.style.current_indent.as_str());
+            }
         }
         self.output.push(']');
         Ok(())
@@ -489,17 +493,19 @@ impl ser::SerializeTupleStruct for &mut Serializer {
     }
 
     fn end(self) -> Result<()> {
-        match self.style.trailing_comma {
+        if !self.output.ends_with('[') {
+            match self.style.trailing_comma {
             TrailingComma::ALL | TrailingComma::OBJECTS => {
                 self.output.push(',')
             }
-            _ => {}
-        }
-        if let Some(ident) = self.style.indent {
+                _ => {}
+            }
+            if let Some(ident) = self.style.indent {
             self.style.current_indent.truncate(self.style.current_indent.len() - ident);
-            self.output.reserve(self.style.current_indent.len() + 1);
-            self.output.push('\n');
-            self.output.push_str(self.style.current_indent.as_str());
+                self.output.reserve(self.style.current_indent.len() + 1);
+                self.output.push('\n');
+                self.output.push_str(self.style.current_indent.as_str());
+            }
         }
         self.output.push(']');
         Ok(())
@@ -546,31 +552,21 @@ impl ser::SerializeTupleVariant for &mut Serializer {
     }
 
     fn end(self) -> Result<()> {
-        match self.style.trailing_comma {
+        if !self.output.ends_with('[') {
+            match self.style.trailing_comma {
             TrailingComma::ALL | TrailingComma::OBJECTS => {
                 self.output.push(',')
             }
-            _ => {}
-        }
-        if let Some(ident) = self.style.indent {
+                _ => {}
+            }
+            if let Some(ident) = self.style.indent {
             self.style.current_indent.truncate(self.style.current_indent.len() - ident);
-            self.output.reserve(self.style.current_indent.len() + 1);
-            self.output.push('\n');
-            self.output.push_str(self.style.current_indent.as_str());
+                self.output.reserve(self.style.current_indent.len() + 1);
+                self.output.push('\n');
+                self.output.push_str(self.style.current_indent.as_str());
+            }
         }
         self.output.push(']');
-        match self.style.trailing_comma {
-            TrailingComma::ALL | TrailingComma::OBJECTS => {
-                self.output.push(',')
-            }
-            _ => {}
-        }
-        if let Some(ident) = self.style.indent {
-            self.style.current_indent.truncate(self.style.current_indent.len() - ident);
-            self.output.reserve(self.style.current_indent.len() + 1);
-            self.output.push('\n');
-            self.output.push_str(self.style.current_indent.as_str());
-        }
         self.output.push('}');
         Ok(())
     }
@@ -634,17 +630,19 @@ impl ser::SerializeMap for &mut Serializer {
     }
 
     fn end(self) -> Result<()> {
-        match self.style.trailing_comma {
+        if !self.output.ends_with('{') {
+            match self.style.trailing_comma {
             TrailingComma::ALL | TrailingComma::OBJECTS => {
                 self.output.push(',')
             }
-            _ => {}
-        }
-        if let Some(ident) = self.style.indent {
+                _ => {}
+            }
+            if let Some(ident) = self.style.indent {
             self.style.current_indent.truncate(self.style.current_indent.len() - ident);
-            self.output.reserve(self.style.current_indent.len() + 1);
-            self.output.push('\n');
-            self.output.push_str(self.style.current_indent.as_str());
+                self.output.reserve(self.style.current_indent.len() + 1);
+                self.output.push('\n');
+                self.output.push_str(self.style.current_indent.as_str());
+            }
         }
         self.output.push('}');
         Ok(())
@@ -686,17 +684,19 @@ impl ser::SerializeStruct for &mut Serializer {
     }
 
     fn end(self) -> Result<()> {
-        match self.style.trailing_comma {
+        if !self.output.ends_with('{') {
+            match self.style.trailing_comma {
             TrailingComma::ALL | TrailingComma::OBJECTS => {
                 self.output.push(',')
             }
-            _ => {}
-        }
-        if let Some(ident) = self.style.indent {
+                _ => {}
+            }
+            if let Some(ident) = self.style.indent {
             self.style.current_indent.truncate(self.style.current_indent.len() - ident);
-            self.output.reserve(self.style.current_indent.len() + 1);
-            self.output.push('\n');
-            self.output.push_str(self.style.current_indent.as_str());
+                self.output.reserve(self.style.current_indent.len() + 1);
+                self.output.push('\n');
+                self.output.push_str(self.style.current_indent.as_str());
+            }
         }
 
         self.output.push('}');
@@ -741,33 +741,21 @@ impl ser::SerializeStructVariant for &mut Serializer {
     }
 
     fn end(self) -> Result<()> {
-        match self.style.trailing_comma {
+        if !self.output.ends_with('{') {
+            match self.style.trailing_comma {
             TrailingComma::ALL | TrailingComma::OBJECTS => {
                 self.output.push(',')
             }
-            _ => {}
-        }
-        if let Some(ident) = self.style.indent {
+                _ => {}
+            }
+            if let Some(ident) = self.style.indent {
             self.style.current_indent.truncate(self.style.current_indent.len() - ident);
-            self.output.reserve(self.style.current_indent.len() + 1);
-            self.output.push('\n');
-            self.output.push_str(self.style.current_indent.as_str());
+                self.output.reserve(self.style.current_indent.len() + 1);
+                self.output.push('\n');
+                self.output.push_str(self.style.current_indent.as_str());
+            }
         }
         self.output.push('}');
-
-
-        match self.style.trailing_comma {
-            TrailingComma::ALL | TrailingComma::OBJECTS => {
-                self.output.push(',')
-            }
-            _ => {}
-        }
-        if let Some(ident) = self.style.indent {
-            self.style.current_indent.truncate(self.style.current_indent.len() - ident);
-            self.output.reserve(self.style.current_indent.len() + 1);
-            self.output.push('\n');
-            self.output.push_str(self.style.current_indent.as_str());
-        }
         self.output.push('}');
         Ok(())
     }
@@ -807,6 +795,19 @@ mod tests {
 }"#;
         let style = FormatConfiguration::with_indent(4, TrailingComma::ALL);
         assert_eq!(to_string_formatted(&test, style).unwrap(), expected);
+        let test2 = Test {
+        int: 1,
+        seq: vec![],
+        };
+        let expected = r#"{
+    "int": 1,
+    "seq": [],
+}"#;
+        let style = FormatConfiguration::with_indent(4, TrailingComma::ALL);
+        assert_eq!(
+        to_string_formatted(&test2, style).unwrap(),
+        expected
+        );
     }
 
 
